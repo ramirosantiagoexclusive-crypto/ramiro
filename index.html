@@ -3,210 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Катапультный шедевр | Эпическая бесконечность</title>
+    <title>Катапульта: Бесконечная Оборона | Fullscreen</title>
     <style>
         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
         body {
-            margin: 0;
-            min-height: 100vh;
-            background: radial-gradient(ellipse at 20% 30%, #0a140c, #020503);
+            background: #0a0f0a;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Segoe UI', 'Poppins', 'Courier New', monospace;
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, 'Poppins', monospace;
             touch-action: none;
-            padding: 16px;
         }
-        .game-container {
-            background: rgba(10, 6, 2, 0.65);
-            backdrop-filter: blur(12px);
-            border-radius: 60px;
-            padding: 16px 20px 20px 20px;
-            box-shadow: 0 30px 45px rgba(0,0,0,0.7), inset 0 1px 3px rgba(255,215,140,0.4);
-            border: 1px solid #f5cf8b;
+        .game-full {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1b2a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         canvas {
             display: block;
-            margin: 0 auto;
-            border-radius: 36px;
-            box-shadow: 0 0 0 5px #b5773a, 0 20px 35px black;
-            cursor: crosshair;
-            background: radial-gradient(ellipse at 30% 40%, #558b34, #2f5a1c);
             width: 100%;
             height: auto;
+            max-height: 70vh;
+            background: radial-gradient(ellipse at 30% 40%, #5d8741, #2a451c);
+            border-radius: 24px;
+            box-shadow: 0 0 0 4px #e7bc7e, 0 15px 30px black;
+            cursor: crosshair;
         }
-        .info-panel {
+        .ui-bar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(12px);
+            border-radius: 60px;
+            padding: 8px 16px;
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            margin-top: 18px;
-            background: rgba(0,0,0,0.65);
-            backdrop-filter: blur(12px);
-            padding: 8px 24px;
-            border-radius: 60px;
-            border: 1px solid #ffdfa5;
-            color: #fff7e8;
-            text-shadow: 2px 2px 0 #2f1e0a;
+            gap: 8px;
+            z-index: 20;
+            border: 1px solid #ffcf7a;
+            color: #fff2cf;
             font-weight: bold;
+            font-size: 0.9rem;
+            pointer-events: none;
         }
-        .stats {
+        .ui-stats {
             display: flex;
-            gap: 18px;
+            gap: 12px;
             flex-wrap: wrap;
-            background: #000000aa;
-            padding: 5px 16px;
+            background: #00000077;
+            padding: 4px 14px;
             border-radius: 48px;
         }
         .stat {
-            background: #2b2013;
-            padding: 4px 14px;
+            background: #2c2319;
+            padding: 2px 10px;
             border-radius: 32px;
-            font-size: 1.1rem;
-            box-shadow: inset 0 1px 4px rgba(0,0,0,0.6), 0 2px 4px rgba(255,220,0,0.2);
+            font-size: 0.85rem;
         }
         .stat span {
             color: #ffd966;
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             font-weight: bold;
-            margin-right: 6px;
+            margin-right: 4px;
         }
         .controls {
+            pointer-events: auto;
             display: flex;
-            gap: 12px;
+            gap: 10px;
         }
         button {
             background: #da943a;
             border: none;
-            font-size: 0.95rem;
             font-weight: bold;
-            padding: 6px 20px;
-            border-radius: 44px;
+            padding: 5px 16px;
+            border-radius: 40px;
             color: #2f210e;
             cursor: pointer;
-            transition: 0.05s linear;
-            box-shadow: 0 4px 0 #754a1a;
+            box-shadow: 0 3px 0 #754a1a;
             font-family: monospace;
+            font-size: 0.8rem;
         }
         button:active {
             transform: translateY(2px);
             box-shadow: 0 1px 0 #754a1a;
         }
-        .level-badge {
-            background: linear-gradient(145deg, #f5bc70, #cf823c);
-            color: #1e1507;
-            padding: 5px 22px;
-            border-radius: 48px;
+        .wave-badge {
+            background: linear-gradient(135deg, #f5bc70, #cf823c);
+            padding: 3px 14px;
+            border-radius: 40px;
             font-weight: bold;
-            font-size: 1.2rem;
-            box-shadow: 0 0 12px #ffcd7e;
+            font-size: 0.9rem;
+            color: #1e1507;
         }
-        .message {
-            background: #0a0602cc;
-            padding: 5px 20px;
-            border-radius: 36px;
-            font-size: 0.8rem;
-            backdrop-filter: blur(8px);
-            border-left: 4px solid gold;
-        }
-        .upgrade-panel {
-            margin-top: 12px;
-            background: #221c10cc;
-            border-radius: 50px;
-            padding: 6px 18px;
+        .upgrade-modal {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(20px);
+            border-radius: 48px;
+            padding: 16px 20px;
+            border: 1px solid #ffcf8a;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             gap: 12px;
-            backdrop-filter: blur(8px);
-            border: 1px solid #f7cd84;
+            z-index: 30;
+            transition: 0.2s;
+            pointer-events: auto;
         }
-        .upgrade-btn {
+        .upgrade-modal button {
             background: #3e2d1a;
-            padding: 5px 16px;
-            font-size: 0.85rem;
-            box-shadow: 0 2px 0 #221707;
+            color: #ffefcf;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 0 #1f1307;
         }
-        .upgrade-price { color: #ffdd99; font-weight: bold; }
-        @media (max-width: 700px) {
-            .stat { font-size: 0.7rem; padding: 2px 8px; }
-            .stat span { font-size: 1rem; }
-            button { padding: 4px 12px; font-size: 0.7rem; }
-            .upgrade-btn { font-size: 0.7rem; }
+        .upgrade-price {
+            color: #ffdd99;
+        }
+        .hidden {
+            display: none;
+        }
+        .info-message {
+            position: fixed;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            background: #000000aa;
+            backdrop-filter: blur(8px);
+            border-radius: 30px;
+            padding: 6px 12px;
+            font-size: 0.7rem;
+            text-align: center;
+            color: #fbe6a0;
+            z-index: 25;
+            pointer-events: none;
+        }
+        @media (min-width: 800px) {
+            canvas { max-height: 75vh; width: auto; max-width: 95%; }
+            .upgrade-modal button { padding: 10px 28px; font-size: 1rem; }
         }
     </style>
 </head>
 <body>
-<div>
-    <div class="game-container">
-        <canvas id="gameCanvas" width="1100" height="600"></canvas>
-        <div class="info-panel">
-            <div class="stats">
-                <div class="stat">🏰 Стены: <span id="baseHp">120</span></div>
-                <div class="stat">💰 Очки: <span id="score">0</span></div>
-                <div class="stat">🌀 Волна: <span id="waveNum">0</span></div>
-                <div class="stat">👾 Враги: <span id="enemiesCount">0</span></div>
-            </div>
-            <div class="controls">
-                <button id="restartBtn">⚡ Новая игра</button>
-            </div>
-            <div class="level-badge" id="waveStatus">БЕСКОНЕЧНАЯ ЭПОПЕЯ</div>
+<div class="game-full">
+    <canvas id="gameCanvas" width="1100" height="600"></canvas>
+    <div class="ui-bar">
+        <div class="ui-stats">
+            <div class="stat">🏰 <span id="baseHp">120</span></div>
+            <div class="stat">💰 <span id="score">0</span></div>
+            <div class="stat">🌀 <span id="waveNum">0</span></div>
+            <div class="stat">👾 <span id="enemiesCount">0</span></div>
         </div>
-        <div class="upgrade-panel">
-            <button class="upgrade-btn" id="upgradeDmg">💥 Урон +12 (<span id="dmgPrice">90</span>)</button>
-            <button class="upgrade-btn" id="upgradeCooldown">⚡ Скорострельность (<span id="cdPrice">80</span>)</button>
-            <button class="upgrade-btn" id="upgradeRadius">🌀 Радиус взрыва (<span id="radPrice">100</span>)</button>
+        <div class="controls">
+            <button id="restartBtn">🔄 Рестарт</button>
         </div>
-        <div class="message" id="gameMsg">🎯 Тяни от катапульты → мощный взрыв! Звук включится после касания.</div>
+        <div class="wave-badge" id="waveStatus">⚡ ЗАЩИТА</div>
     </div>
+    <div id="upgradeModal" class="upgrade-modal hidden">
+        <button id="upgradeDmgModal">💥 Урон +12 (<span id="dmgPriceModal">90</span>)</button>
+        <button id="upgradeCdModal">⚡ Скорострельность (<span id="cdPriceModal">80</span>)</button>
+        <button id="upgradeRadModal">🌀 Радиус взрыва (<span id="radPriceModal">100</span>)</button>
+        <button id="closeUpgradeBtn">🚀 Продолжить</button>
+    </div>
+    <div class="info-message" id="gameMsg">🎯 Тяни пальцем/мышкой от катапульты — отпусти для выстрела! Улучшения после волны.</div>
 </div>
 
 <script>
     (function(){
-        // -------------------------- WEB AUDIO --------------------------
+        // ---------- АУДИО (опционально) ----------
         let audioCtx = null;
-        let soundEnabled = false;
-        function initAudio() {
-            if(audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            soundEnabled = true;
-        }
-        function playSound(type) {
-            if(!soundEnabled || !audioCtx) return;
-            const now = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
-            if(type === 'shoot') {
-                osc.frequency.value = 320;
-                gain.gain.setValueAtTime(0.15, now);
-                osc.start();
-                osc.stop(now+0.25);
-            } else if(type === 'explode') {
-                osc.frequency.value = 140;
-                gain.gain.setValueAtTime(0.25, now);
+        function playSound(type){
+            if(!audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now+0.4);
+                if(type==='shoot') osc.frequency.value = 330;
+                else if(type==='explode') osc.frequency.value = 130;
+                else if(type==='death') osc.frequency.value = 80;
+                else osc.frequency.value = 260;
                 osc.start();
                 osc.stop(now+0.35);
-            } else if(type === 'death') {
-                osc.frequency.value = 80;
-                gain.gain.setValueAtTime(0.2, now);
-                osc.start();
-                osc.stop(now+0.2);
-            } else if(type === 'wave') {
-                osc.frequency.value = 280;
-                gain.gain.setValueAtTime(0.18, now);
-                osc.start();
-                osc.stop(now+0.4);
-            }
+            } catch(e){}
         }
-
+        function initAudio() { if(!audioCtx) { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); playSound('wave'); } }
+        
         // ---------- CANVAS ----------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -220,69 +226,51 @@
         }
         window.addEventListener('resize', updateCanvasScale);
         updateCanvasScale();
-
-        // ---------- БАЛАНС И ПАРАМЕТРЫ ----------
+        
+        // ---------- ИГРОВЫЕ ПАРАМЕТРЫ ----------
         const GROUND_Y = 520;
         const CATAPULT_X = 130;
         const CATAPULT_Y = GROUND_Y - 18;
         const GRAVITY = 0.28;
         
-        let baseDamage = 75;          // начальный урон (чуть ниже, чтобы не убивало всё сразу)
-        let baseExplosionRadius = 52;
-        let baseCooldownMax = 26;
-        
-        let extraDamage = 0;
-        let extraRadius = 0;
-        let cooldownReduction = 0;
-        let currentDamage = baseDamage;
-        let currentRadius = baseExplosionRadius;
-        let currentCooldownMax = baseCooldownMax;
+        let baseDamage = 78;
+        let baseExplosionRadius = 54;
+        let baseCooldownMax = 27;
+        let extraDamage = 0, extraRadius = 0, cooldownReduction = 0;
+        let currentDamage = baseDamage, currentRadius = baseExplosionRadius, currentCooldownMax = baseCooldownMax;
         
         let baseHealth = 125;
         let score = 0;
         let waveNumber = 0;
-        let enemies = [];
-        let projectiles = [];
-        let effects = [];
-        let particles = [];
+        let enemies = [], projectiles = [], effects = [], particles = [];
         let gameActive = true;
         let waveInProgress = true;
         let waveTransitionTimer = 0;
-        
-        let canShoot = true;
-        let shootCooldown = 0;
-        let isDragging = false;
-        let dragCurrent = { x: CATAPULT_X, y: CATAPULT_Y };
         let enemiesToSpawn = [];
         let waveSpawnTimer = 0;
+        let canShoot = true, shootCooldown = 0;
+        let isDragging = false;
+        let dragCurrent = { x: CATAPULT_X, y: CATAPULT_Y-10 };
         
-        // улучшения
-        let upgradeDmgLevel = 0, upgradeCDLevel = 0, upgradeRadLevel = 0;
-        let dmgPrice = 90, cdPrice = 80, radPrice = 100;
+        // Апгрейды цены
+        let upgradeDmgLevel=0, upgradeCDLevel=0, upgradeRadLevel=0;
+        let dmgPrice=90, cdPrice=80, radPrice=100;
+        let modalVisible = false;
         
-        // ---------- ВРАГИ (с динамическим ростом, чтобы не убивались с одного выстрела) ----------
+        // Типы врагов (баланс)
         const EnemyBaseTypes = {
-            'footman': { name: 'Пехотинец', baseHp: 46, baseSpeed: 1.1, color: '#bc9a6c', reward: 26, radius: 16, scaleFactor: 1.0 },
-            'heavy': { name: 'Рыцарь', baseHp: 100, baseSpeed: 0.72, color: '#7a5a4a', reward: 48, radius: 20, scaleFactor: 1.2 },
-            'swift': { name: 'Лучник', baseHp: 32, baseSpeed: 1.88, color: '#dbb46a', reward: 22, radius: 14, scaleFactor: 0.9 },
-            'brute': { name: 'Берсерк', baseHp: 165, baseSpeed: 0.65, color: '#ac4c3a', reward: 88, radius: 24, scaleFactor: 1.5 }
+            'footman': { name: 'Пехотинец', baseHp: 48, baseSpeed: 1.08, color: '#bc9a6c', reward: 28, radius: 16 },
+            'heavy': { name: 'Рыцарь', baseHp: 102, baseSpeed: 0.70, color: '#7a5a4a', reward: 50, radius: 20 },
+            'swift': { name: 'Лучник', baseHp: 34, baseSpeed: 1.86, color: '#dbb46a', reward: 24, radius: 14 },
+            'brute': { name: 'Берсерк', baseHp: 172, baseSpeed: 0.63, color: '#ac4c3a', reward: 90, radius: 24 }
         };
         
-        function getScaledEnemyType(base, wave) {
-            let scale = 1 + wave * 0.105;   // +10% здоровья за волну, чтобы не становилось слишком легко
+        function getScaledEnemyType(base, wave){
+            let scale = 1 + wave * 0.105;
             let hp = Math.floor(base.baseHp * scale);
             let reward = Math.floor(base.reward * (1 + wave * 0.07));
             let speed = base.baseSpeed * (1 - Math.min(0.28, wave * 0.008));
-            return {
-                name: base.name,
-                hp: hp,
-                maxHp: hp,
-                speed: Math.max(0.58, speed),
-                color: base.color,
-                reward: reward,
-                radius: base.radius,
-                baseRef: base
-            };
+            return { ...base, hp, maxHp: hp, speed: Math.max(0.58,speed), reward, radius: base.radius };
         }
         
         const waypoints = [
@@ -295,251 +283,256 @@
         ];
         
         class Enemy {
-            constructor(typeObj, waypointsCopy) {
-                this.typeData = typeObj;
+            constructor(typeObj, waypointsCopy){
+                this.type = typeObj;
                 this.hp = typeObj.hp;
                 this.maxHp = typeObj.maxHp;
                 this.speed = typeObj.speed;
                 this.radius = typeObj.radius;
                 this.color = typeObj.color;
                 this.reward = typeObj.reward;
-                this.waypointIndex = 1;
-                this.pos = { ...waypointsCopy[0] };
-                this.targetWaypoint = waypointsCopy[1];
+                this.wpIndex = 1;
+                this.pos = {...waypointsCopy[0]};
+                this.target = waypointsCopy[1];
                 this.alive = true;
-                this.deathEffect = false;
-                this.animOffset = Math.random() * Math.PI * 2;
             }
-            update() {
-                if (!this.alive) return;
-                const dx = this.targetWaypoint.x - this.pos.x;
-                const dy = this.targetWaypoint.y - this.pos.y;
-                const distance = Math.hypot(dx, dy);
-                if (distance < 3) {
-                    this.waypointIndex++;
-                    if (this.waypointIndex >= waypoints.length) {
-                        let dmg = Math.floor(this.hp / 2.3 + 12);
+            update(){
+                if(!this.alive) return;
+                const dx = this.target.x - this.pos.x;
+                const dy = this.target.y - this.pos.y;
+                const dist = Math.hypot(dx,dy);
+                if(dist < 3){
+                    this.wpIndex++;
+                    if(this.wpIndex >= waypoints.length){
+                        let dmg = Math.floor(this.hp/2.3 + 12);
                         baseHealth = Math.max(0, baseHealth - dmg);
                         updateUI();
                         this.alive = false;
-                        if(baseHealth <= 0) gameOver();
-                        playSound('death');
-                        for(let i=0;i<12;i++) particles.push({ x: this.pos.x, y: this.pos.y, life: 0.7, size: Math.random()*5+3, color: '#aa5533', vx: (Math.random()-0.5)*2, vy: -Math.random()*2 });
+                        if(baseHealth<=0) gameOver();
+                        for(let i=0;i<8;i++) particles.push({x:this.pos.x, y:this.pos.y, life:0.6, size:Math.random()*5+2, color:'#aa5533', vx:(Math.random()-0.5)*2, vy:-Math.random()*2});
                         return;
                     }
-                    this.targetWaypoint = waypoints[this.waypointIndex];
+                    this.target = waypoints[this.wpIndex];
                 } else {
-                    const step = Math.min(this.speed, distance);
-                    const angle = Math.atan2(dy, dx);
-                    this.pos.x += Math.cos(angle) * step;
-                    this.pos.y += Math.sin(angle) * step;
+                    let step = Math.min(this.speed, dist);
+                    let angle = Math.atan2(dy,dx);
+                    this.pos.x += Math.cos(angle)*step;
+                    this.pos.y += Math.sin(angle)*step;
                 }
-                if(Math.random() < 0.08) particles.push({ x: this.pos.x, y: this.pos.y+3, life: 0.6, size: 2.5, color: '#b87c4a', vx: (Math.random()-0.5)*0.5, vy: 0.5 });
+                if(Math.random()<0.07) particles.push({x:this.pos.x, y:this.pos.y+4, life:0.5, size:2, color:'#b87c4a', vx:(Math.random()-0.5)*0.6, vy:0.3});
             }
-            draw(ctx) {
-                if (!this.alive) return;
+            draw(ctx){
+                if(!this.alive) return;
                 ctx.save();
                 ctx.shadowBlur = 8;
-                ctx.shadowColor = "rgba(0,0,0,0.7)";
                 ctx.beginPath();
                 ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2);
                 const grad = ctx.createRadialGradient(this.pos.x-4, this.pos.y-4, 3, this.pos.x, this.pos.y, this.radius);
-                grad.addColorStop(0, this.color);
-                grad.addColorStop(1, '#5a3822');
+                grad.addColorStop(0, this.color); grad.addColorStop(1, '#5a3822');
                 ctx.fillStyle = grad;
                 ctx.fill();
-                ctx.strokeStyle = '#ffdead';
-                ctx.lineWidth = 1.8;
-                ctx.stroke();
-                ctx.fillStyle = '#fff6df';
-                ctx.font = `bold ${Math.max(11, this.radius-4)}px monospace`;
-                ctx.fillText(`${this.hp}`, this.pos.x-14, this.pos.y-9);
-                // хп бар
-                ctx.fillStyle = "#631e12";
-                ctx.fillRect(this.pos.x-this.radius, this.pos.y-this.radius-6, this.radius*2, 6);
-                const hpPercent = this.hp/this.maxHp;
-                ctx.fillStyle = "#ffa54d";
-                ctx.fillRect(this.pos.x-this.radius, this.pos.y-this.radius-6, this.radius*2*hpPercent, 6);
+                ctx.strokeStyle = '#ffe6b3'; ctx.lineWidth=1.5; ctx.stroke();
+                ctx.fillStyle='#fff2df'; ctx.font=`bold ${Math.max(11, this.radius-4)}px monospace`;
+                ctx.fillText(`${this.hp}`, this.pos.x-14, this.pos.y-8);
+                ctx.fillStyle="#631e12"; ctx.fillRect(this.pos.x-this.radius, this.pos.y-this.radius-6, this.radius*2, 5);
+                let percent = this.hp/this.maxHp;
+                ctx.fillStyle="#ffa54d"; ctx.fillRect(this.pos.x-this.radius, this.pos.y-this.radius-6, this.radius*2*percent, 5);
                 ctx.restore();
             }
         }
         
         class Projectile {
-            constructor(x, y, vx, vy) {
-                this.x = x; this.y = y; this.vx = vx; this.vy = vy;
-                this.radius = 10; this.active = true; this.trail = [];
+            constructor(x,y,vx,vy){
+                this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.radius=10; this.active=true; this.trail=[];
             }
-            update() {
-                if (!this.active) return;
-                this.trail.push({x: this.x, y: this.y});
-                if(this.trail.length > 6) this.trail.shift();
-                this.x += this.vx; this.y += this.vy; this.vy += GRAVITY;
-                if (this.y + this.radius >= GROUND_Y) { this.explode(); return; }
-                for(let e of enemies) {
-                    if(!e.alive) continue;
-                    if(Math.hypot(this.x - e.pos.x, this.y - e.pos.y) < this.radius + e.radius) {
-                        this.explode(); break;
-                    }
-                }
-                if(this.x + this.radius < 0 || this.x - this.radius > canvas.width) this.active = false;
-            }
-            explode() {
+            update(){
                 if(!this.active) return;
-                this.active = false;
-                let hit = false;
-                for(let e of enemies) {
+                this.trail.push({x:this.x,y:this.y}); if(this.trail.length>5) this.trail.shift();
+                this.x+=this.vx; this.y+=this.vy; this.vy+=GRAVITY;
+                if(this.y+this.radius>=GROUND_Y){ this.explode(); return; }
+                for(let e of enemies){
                     if(!e.alive) continue;
-                    if(Math.hypot(this.x - e.pos.x, this.y - e.pos.y) < currentRadius) {
+                    if(Math.hypot(this.x-e.pos.x, this.y-e.pos.y) < this.radius+e.radius){ this.explode(); break; }
+                }
+                if(this.x+this.radius<0 || this.x-this.radius>canvas.width) this.active=false;
+            }
+            explode(){
+                if(!this.active) return;
+                this.active=false;
+                let hit=false;
+                for(let e of enemies){
+                    if(!e.alive) continue;
+                    if(Math.hypot(this.x-e.pos.x, this.y-e.pos.y) < currentRadius){
                         e.hp -= currentDamage;
-                        hit = true;
-                        if(e.hp <= 0) {
-                            e.alive = false;
+                        hit=true;
+                        if(e.hp<=0){
+                            e.alive=false;
                             score += e.reward;
                             updateUI();
                             playSound('death');
-                            for(let i=0;i<18;i++) particles.push({ x: e.pos.x + (Math.random()-0.5)*15, y: e.pos.y-5, life: 0.8, size: Math.random()*6+2, color: '#ff7733', vx: (Math.random()-0.5)*3, vy: -Math.random()*4 });
+                            for(let i=0;i<14;i++) particles.push({x:e.pos.x+(Math.random()-0.5)*15, y:e.pos.y-4, life:0.7, size:Math.random()*6+2, color:'#ff7733', vx:(Math.random()-0.5)*3, vy:-Math.random()*4});
                         }
                     }
                 }
                 if(hit) playSound('explode');
-                effects.push({ x: this.x, y: this.y, radius: currentRadius, alpha: 0.85, frames: 10 });
-                for(let s=0;s<22;s++) particles.push({ x: this.x + (Math.random()-0.5)*40, y: this.y-5, life: 0.7, size: Math.random()*5+2, color: '#ffaa44', vx: (Math.random()-0.5)*2, vy: -Math.random()*3 });
+                effects.push({x:this.x, y:this.y, radius:currentRadius, alpha:0.85, frames:10});
+                for(let s=0;s<18;s++) particles.push({x:this.x+(Math.random()-0.5)*35, y:this.y-5, life:0.7, size:Math.random()*5+2, color:'#ffaa44', vx:(Math.random()-0.5)*2.5, vy:-Math.random()*3});
                 updateUI();
             }
-            draw(ctx) {
+            draw(ctx){
                 if(!this.active) return;
-                for(let i=0;i<this.trail.length;i++) {
+                for(let i=0;i<this.trail.length;i++){
                     ctx.beginPath();
                     ctx.arc(this.trail[i].x, this.trail[i].y, this.radius-4, 0, Math.PI*2);
-                    ctx.fillStyle = `rgba(255, 100, 20, ${0.2 + i*0.1})`;
+                    ctx.fillStyle = `rgba(255, 100, 20, ${0.2+i*0.1})`;
                     ctx.fill();
                 }
-                ctx.shadowBlur = 12;
-                ctx.shadowColor = 'orange';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius-2, 0, Math.PI*2);
-                ctx.fillStyle = '#ffb347';
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(this.x-3, this.y-3, 4, 0, Math.PI*2);
-                ctx.fillStyle = '#ffffaa';
-                ctx.fill();
-                ctx.shadowBlur = 0;
+                ctx.shadowBlur=10; ctx.shadowColor='orange';
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius-2, 0, Math.PI*2);
+                ctx.fillStyle='#ffb347'; ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x-3, this.y-3, 4, 0, Math.PI*2);
+                ctx.fillStyle='#ffffaa'; ctx.fill();
+                ctx.shadowBlur=0;
             }
         }
         
-        // ---------- ГЕНЕРАЦИЯ ВОЛН (сбалансированная сложность)----------
-        function generateWave(waveIdx) {
+        // --- Генерация волн ---
+        function generateWave(waveIdx){
             let wave = [];
             let baseTotal = 4 + Math.floor(waveIdx * 0.65);
-            let enemyPool = ['footman','heavy','swift'];
-            if(waveIdx >= 2) enemyPool.push('brute');
-            for(let i=0; i<baseTotal + Math.floor(Math.random() * 3); i++) {
-                let typeKey = enemyPool[Math.floor(Math.random() * enemyPool.length)];
-                if(waveIdx > 6 && Math.random()<0.25) typeKey = 'brute';
-                wave.push(typeKey);
+            let pool = ['footman','heavy','swift'];
+            if(waveIdx>=2) pool.push('brute');
+            for(let i=0;i<baseTotal+Math.floor(Math.random()*3);i++){
+                let key = pool[Math.floor(Math.random()*pool.length)];
+                if(waveIdx>6 && Math.random()<0.25) key='brute';
+                wave.push(key);
             }
-            if(waveIdx > 3 && wave.filter(t=>t==='heavy').length < 2) wave.push('heavy');
-            if(waveIdx > 5 && wave.filter(t=>t==='brute').length < 1) wave.push('brute');
+            if(waveIdx>3 && wave.filter(t=>t==='heavy').length<2) wave.push('heavy');
+            if(waveIdx>5 && wave.filter(t=>t==='brute').length<1) wave.push('brute');
             return wave;
         }
-        
-        function buildWaveSpawnQueue(waveNumber) {
-            const composition = generateWave(waveNumber);
+        function buildSpawnQueue(waveNum){
+            let comp = generateWave(waveNum);
             let list = [];
             let baseDelay = 16;
-            for(let i=0;i<composition.length;i++) {
-                const baseType = EnemyBaseTypes[composition[i]];
-                const scaled = getScaledEnemyType(baseType, waveNumber);
-                list.push({ typeObj: scaled, delayFrames: baseDelay + i * 13 });
+            for(let i=0;i<comp.length;i++){
+                let baseT = EnemyBaseTypes[comp[i]];
+                let scaled = getScaledEnemyType(baseT, waveNum);
+                list.push({ typeObj: scaled, delayFrames: baseDelay + i*13 });
             }
-            for(let i=list.length-1;i>0;i--) { let j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
+            for(let i=list.length-1;i>0;i--){ let j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
             return list;
         }
         
-        function startWave(waveIdx) {
-            enemiesToSpawn = buildWaveSpawnQueue(waveIdx);
+        function startWave(waveIdx){
+            enemiesToSpawn = buildSpawnQueue(waveIdx);
             waveSpawnTimer = 5;
             waveInProgress = true;
             waveTransitionTimer = 0;
-            document.getElementById('waveStatus').innerHTML = `⚔️ ВОЛНА ${waveIdx+1}  |  Сложность: ${Math.min(99, 50+waveIdx*4)}%`;
-            document.getElementById('gameMsg').innerHTML = `🔥 Волна ${waveIdx+1} началась! Улучшения помогут выжить.`;
+            document.getElementById('waveStatus').innerHTML = `⚔️ ВОЛНА ${waveIdx+1}`;
+            document.getElementById('gameMsg').innerHTML = `🔥 Волна ${waveIdx+1} началась! Стреляй!`;
             playSound('wave');
-            for(let i=0;i<35;i++) particles.push({ x: canvas.width/2 + (Math.random()-0.5)*220, y: GROUND_Y-40, life: 0.9, size: Math.random()*7+3, color: '#ffbb66', vx: (Math.random()-0.5)*1.2, vy: -Math.random()*2 });
+            for(let i=0;i<30;i++) particles.push({ x: canvas.width/2+(Math.random()-0.5)*200, y: GROUND_Y-40, life:0.8, size:Math.random()*7+3, color:'#ffbb66', vx:(Math.random()-0.5)*1.2, vy:-Math.random()*2 });
         }
         
-        function updateWaveLogic() {
+        function updateWaveLogic(){
             if(!gameActive) return;
-            if(waveTransitionTimer > 0) {
+            if(waveTransitionTimer > 0){
                 waveTransitionTimer--;
-                if(waveTransitionTimer === 0) startWave(waveNumber);
+                if(waveTransitionTimer===0) startWave(waveNumber);
                 return;
             }
-            if(waveInProgress) {
-                if(enemiesToSpawn.length > 0) {
-                    if(waveSpawnTimer <= 0) {
+            if(waveInProgress){
+                if(enemiesToSpawn.length>0){
+                    if(waveSpawnTimer<=0){
                         let next = enemiesToSpawn.shift();
                         enemies.push(new Enemy(next.typeObj, waypoints));
                         let addDelay = Math.max(13, 30 - Math.floor(waveNumber/2.5));
                         waveSpawnTimer = addDelay;
                     } else waveSpawnTimer--;
                 }
-                if(enemies.length === 0 && enemiesToSpawn.length === 0 && waveInProgress) {
+                if(enemies.length===0 && enemiesToSpawn.length===0 && waveInProgress){
                     waveInProgress = false;
                     waveNumber++;
                     updateUI();
-                    document.getElementById('waveStatus').innerHTML = `✨ ВОЛНА ${waveNumber} ПРОЙДЕНА! ✨`;
-                    document.getElementById('gameMsg').innerHTML = `🏆 Волна ${waveNumber} завершена! Пауза перед следующей.`;
-                    waveTransitionTimer = 38;
-                    for(let i=0;i<50;i++) particles.push({ x: CATAPULT_X+25, y: GROUND_Y-45, life: 0.8, size: Math.random()*6+2, color: '#ffdd99', vx: (Math.random()-0.5)*1.5, vy: -Math.random()*3 });
+                    document.getElementById('waveStatus').innerHTML = `✨ ВОЛНА ${waveNumber} ПРОЙДЕНА ✨`;
+                    document.getElementById('gameMsg').innerHTML = `🏆 Волна ${waveNumber} завершена! Улучшения доступны.`;
+                    showUpgradeModal();  // показываем апгрейды после волны
+                    waveTransitionTimer = 1; // чтобы не стартанула сразу
+                    for(let i=0;i<45;i++) particles.push({ x: CATAPULT_X+30, y: GROUND_Y-50, life:0.8, size:Math.random()*6+2, color:'#ffdd99', vx:(Math.random()-0.5)*1.5, vy:-Math.random()*3 });
                     playSound('wave');
                 }
             }
         }
         
-        // ----- АПГРЕЙДЫ с контролем силы -----
-        function updateStatsFromUpgrades() {
+        // Модальное окно улучшений
+        function showUpgradeModal(){
+            if(modalVisible) return;
+            modalVisible = true;
+            document.getElementById('upgradeModal').classList.remove('hidden');
+            document.getElementById('dmgPriceModal').innerText = dmgPrice;
+            document.getElementById('cdPriceModal').innerText = cdPrice;
+            document.getElementById('radPriceModal').innerText = radPrice;
+        }
+        function hideUpgradeModal(){
+            document.getElementById('upgradeModal').classList.add('hidden');
+            modalVisible = false;
+            // продолжить игру, запустить следующую волну
+            if(!waveInProgress && gameActive){
+                waveTransitionTimer = 0;
+                startWave(waveNumber);
+            }
+        }
+        function applyUpgradeFromModal(type){
+            if(!gameActive) return;
+            if(type==='dmg' && score>=dmgPrice){
+                score -= dmgPrice; extraDamage += 12; upgradeDmgLevel++;
+                dmgPrice = Math.floor(90 + upgradeDmgLevel * 42);
+                updateStats();
+                updateUI();
+                document.getElementById('gameMsg').innerHTML = '💢 Урон повышен!';
+                playSound('shoot');
+            } else if(type==='cd' && score>=cdPrice){
+                score -= cdPrice; cooldownReduction += 2.5; if(cooldownReduction>14) cooldownReduction=14;
+                upgradeCDLevel++; cdPrice = Math.floor(80 + upgradeCDLevel * 34);
+                updateStats(); updateUI();
+                document.getElementById('gameMsg').innerHTML = '⚡ Скорострельность увеличена!';
+                playSound('shoot');
+            } else if(type==='rad' && score>=radPrice){
+                score -= radPrice; extraRadius += 11; upgradeRadLevel++;
+                radPrice = Math.floor(100 + upgradeRadLevel * 44);
+                updateStats(); updateUI();
+                document.getElementById('gameMsg').innerHTML = '🌀 Радиус взрыва увеличен!';
+                playSound('shoot');
+            } else {
+                document.getElementById('gameMsg').innerHTML = '💰 Не хватает очков! Уничтожай врагов.';
+                return;
+            }
+            updateModalPrices();
+        }
+        function updateModalPrices(){
+            document.getElementById('dmgPriceModal').innerText = dmgPrice;
+            document.getElementById('cdPriceModal').innerText = cdPrice;
+            document.getElementById('radPriceModal').innerText = radPrice;
+        }
+        function updateStats(){
             currentDamage = baseDamage + extraDamage;
             currentRadius = baseExplosionRadius + extraRadius;
             let cdVal = baseCooldownMax - cooldownReduction;
             if(cdVal < 11) cdVal = 11;
             currentCooldownMax = cdVal;
-            document.getElementById('dmgPrice').innerText = dmgPrice;
-            document.getElementById('cdPrice').innerText = cdPrice;
-            document.getElementById('radPrice').innerText = radPrice;
         }
         
-        function applyUpgrade(type) {
-            if(type === 'dmg' && score >= dmgPrice) {
-                score -= dmgPrice; extraDamage += 12; upgradeDmgLevel++;
-                dmgPrice = Math.floor(90 + upgradeDmgLevel * 40);
-                updateStatsFromUpgrades(); updateUI();
-                document.getElementById('gameMsg').innerHTML = '💢 Урон повышен, но враги тоже растут!';
-                return true;
-            } else if(type === 'cd' && score >= cdPrice) {
-                score -= cdPrice; cooldownReduction += 2.5; if(cooldownReduction > 14) cooldownReduction = 14;
-                upgradeCDLevel++; cdPrice = Math.floor(80 + upgradeCDLevel * 32);
-                updateStatsFromUpgrades(); updateUI();
-                document.getElementById('gameMsg').innerHTML = '⚡ Скорострельность увеличена.';
-                return true;
-            } else if(type === 'rad' && score >= radPrice) {
-                score -= radPrice; extraRadius += 11; upgradeRadLevel++;
-                radPrice = Math.floor(100 + upgradeRadLevel * 42);
-                updateStatsFromUpgrades(); updateUI();
-                document.getElementById('gameMsg').innerHTML = '🌀 Радиус взрыва расширен!';
-                return true;
-            } else { document.getElementById('gameMsg').innerHTML = '💰 Недостаточно очков!'; return false; }
-        }
-        
-        function shootFromCatapult(targetX, targetY) {
+        function shootFromCatapult(targetX, targetY){
             if(!gameActive || !canShoot) return false;
-            let dx = targetX - CATAPULT_X, dy = targetY - CATAPULT_Y;
-            let dist = Math.min(290, Math.hypot(dx, dy));
+            let dx = targetX - CATAPULT_X;
+            let dy = targetY - (CATAPULT_Y-12);
+            let dist = Math.min(300, Math.hypot(dx,dy));
             if(dist < 18) return false;
             let angle = Math.atan2(dy, dx);
-            let power = dist * 0.71;
-            let vx = Math.cos(angle) * Math.min(power, 15.2);
-            let vy = Math.sin(angle) * Math.min(power, 15.2);
+            let power = dist * 0.72;
+            let vx = Math.cos(angle) * Math.min(power, 15.5);
+            let vy = Math.sin(angle) * Math.min(power, 15.5);
             let shell = new Projectile(CATAPULT_X, CATAPULT_Y-12, vx, vy);
             projectiles.push(shell);
             canShoot = false;
@@ -548,116 +541,158 @@
             return true;
         }
         
-        function updateGame() {
+        function updateGame(){
             if(!gameActive) return;
             updateWaveLogic();
-            for(let i=0;i<enemies.length;i++) { enemies[i].update(); if(!enemies[i].alive) { enemies.splice(i,1); i--; } }
-            for(let i=0;i<projectiles.length;i++) { projectiles[i].update(); if(!projectiles[i].active) { projectiles.splice(i,1); i--; } }
-            if(!canShoot) { shootCooldown--; if(shootCooldown <= 0) canShoot = true; }
-            if(baseHealth <= 0) { gameActive = false; document.getElementById('waveStatus').innerHTML = '💀 ПОРАЖЕНИЕ 💀'; document.getElementById('gameMsg').innerHTML = '❌ Стены пали. Нажми "Новая игра" ❌'; }
-            for(let i=0;i<particles.length;i++) {
+            for(let i=0;i<enemies.length;i++){ enemies[i].update(); if(!enemies[i].alive){ enemies.splice(i,1); i--; } }
+            for(let i=0;i<projectiles.length;i++){ projectiles[i].update(); if(!projectiles[i].active){ projectiles.splice(i,1); i--; } }
+            if(!canShoot){ shootCooldown--; if(shootCooldown<=0) canShoot=true; }
+            if(baseHealth<=0){ gameActive=false; document.getElementById('waveStatus').innerHTML='💀 ПОРАЖЕНИЕ 💀'; document.getElementById('gameMsg').innerHTML='❌ Игра окончена. Нажми Рестарт ❌'; }
+            for(let i=0;i<particles.length;i++){
                 particles[i].life -= 0.02;
                 if(particles[i].vx) particles[i].x += particles[i].vx;
                 if(particles[i].vy) particles[i].y += particles[i].vy;
-                if(particles[i].life <= 0) { particles.splice(i,1); i--; }
-                else { if(!particles[i].vx) particles[i].x += (Math.random()-0.5)*0.8; particles[i].y -= 0.8; }
+                if(particles[i].life<=0){ particles.splice(i,1); i--; }
+                else { if(!particles[i].vx) particles[i].x += (Math.random()-0.5)*0.8; particles[i].y -= 0.9; }
             }
-            for(let i=0;i<effects.length;i++) { effects[i].frames--; effects[i].alpha = effects[i].frames/10; if(effects[i].frames <=0) effects.splice(i,1), i--; }
+            for(let i=0;i<effects.length;i++){ effects[i].frames--; effects[i].alpha = effects[i].frames/10; if(effects[i].frames<=0) effects.splice(i,1),i--; }
             updateUI();
         }
         
-        // ---------- ЭПИЧНАЯ ОТРИСОВКА ----------
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const gradSky = ctx.createLinearGradient(0,0,0,GROUND_Y-70);
+        // Отрисовка с упрощённым прицелом (с любого места)
+        function draw(){
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            let gradSky = ctx.createLinearGradient(0,0,0,GROUND_Y-70);
             gradSky.addColorStop(0,'#416f35'); gradSky.addColorStop(1,'#78a658');
-            ctx.fillStyle = gradSky; ctx.fillRect(0,0,canvas.width,GROUND_Y-40);
-            ctx.fillStyle = '#7a5d38'; ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height-GROUND_Y+8);
+            ctx.fillStyle=gradSky; ctx.fillRect(0,0,canvas.width,GROUND_Y-40);
+            ctx.fillStyle='#7a5d38'; ctx.fillRect(0,GROUND_Y, canvas.width, canvas.height-GROUND_Y+8);
             for(let i=0;i<25;i++) ctx.fillRect(i*55, GROUND_Y-4, 32, 8);
-            // Замок с башнями
-            ctx.shadowBlur = 6; ctx.fillStyle = '#cfaa77'; ctx.fillRect(35, GROUND_Y-56, 55, 62);
-            ctx.fillStyle = '#fad48b'; ctx.fillRect(48, GROUND_Y-80, 30, 34);
-            ctx.beginPath(); ctx.moveTo(30, GROUND_Y-56); ctx.lineTo(62, GROUND_Y-92); ctx.lineTo(95, GROUND_Y-56); ctx.fillStyle = '#ffde9e'; ctx.fill();
-            // Катапульта улучшенная
-            ctx.fillStyle = '#9b6f42'; ctx.fillRect(CATAPULT_X-20, CATAPULT_Y-16, 40, 30);
-            ctx.fillStyle = '#e3aa66'; ctx.beginPath(); ctx.moveTo(CATAPULT_X-12, CATAPULT_Y-25); ctx.lineTo(CATAPULT_X, CATAPULT_Y-54); ctx.lineTo(CATAPULT_X+12, CATAPULT_Y-25); ctx.fill();
-            ctx.fillStyle = '#7a4c28'; ctx.beginPath(); ctx.ellipse(CATAPULT_X, CATAPULT_Y-12, 16, 10, 0, 0, Math.PI*2); ctx.fill();
-            // Прицел
-            if(isDragging && gameActive) {
+            ctx.fillStyle='#cfaa77'; ctx.fillRect(35, GROUND_Y-56, 55, 62);
+            ctx.fillStyle='#fad48b'; ctx.fillRect(48, GROUND_Y-80, 30, 34);
+            ctx.beginPath(); ctx.moveTo(30, GROUND_Y-56); ctx.lineTo(62, GROUND_Y-92); ctx.lineTo(95, GROUND_Y-56); ctx.fillStyle='#ffde9e'; ctx.fill();
+            ctx.fillStyle='#9b6f42'; ctx.fillRect(CATAPULT_X-20, CATAPULT_Y-16, 40, 30);
+            ctx.fillStyle='#e3aa66'; ctx.beginPath(); ctx.moveTo(CATAPULT_X-12, CATAPULT_Y-25); ctx.lineTo(CATAPULT_X, CATAPULT_Y-54); ctx.lineTo(CATAPULT_X+12, CATAPULT_Y-25); ctx.fill();
+            ctx.fillStyle='#7a4c28'; ctx.beginPath(); ctx.ellipse(CATAPULT_X, CATAPULT_Y-12, 16, 10, 0, 0, Math.PI*2); ctx.fill();
+            
+            // прицел из любой точки, но всегда от катапульты
+            if(isDragging && gameActive){
                 ctx.beginPath(); ctx.setLineDash([8,12]);
                 ctx.moveTo(CATAPULT_X, CATAPULT_Y-14); ctx.lineTo(dragCurrent.x, dragCurrent.y);
-                ctx.strokeStyle = '#fffeca'; ctx.lineWidth = 4; ctx.stroke();
+                ctx.strokeStyle='#fffeca'; ctx.lineWidth=4; ctx.stroke();
                 ctx.setLineDash([]);
-                let dxT = dragCurrent.x - CATAPULT_X, dyT = dragCurrent.y - CATAPULT_Y;
-                let dist = Math.min(290, Math.hypot(dxT, dyT));
-                if(dist>16) {
-                    let ang = Math.atan2(dyT, dxT), spd = dist * 0.71;
-                    let vx = Math.cos(ang)*Math.min(spd,15.2), vy = Math.sin(ang)*Math.min(spd,15.2);
-                    let px = CATAPULT_X, py = CATAPULT_Y-14, vxt=vx, vyt=vy;
-                    ctx.beginPath(); ctx.moveTo(px, py);
-                    for(let s=0;s<35;s++) { px += vxt; py += vyt; vyt += GRAVITY; if(py > GROUND_Y) break; ctx.lineTo(px, py); }
-                    ctx.strokeStyle = '#ffcc77'; ctx.lineWidth = 3.5; ctx.stroke();
+                let dxT = dragCurrent.x - CATAPULT_X;
+                let dyT = dragCurrent.y - (CATAPULT_Y-14);
+                let dist = Math.min(300, Math.hypot(dxT, dyT));
+                if(dist>16){
+                    let ang = Math.atan2(dyT, dxT);
+                    let spd = dist * 0.72;
+                    let vx = Math.cos(ang)*Math.min(spd,15.5);
+                    let vy = Math.sin(ang)*Math.min(spd,15.5);
+                    let px=CATAPULT_X, py=CATAPULT_Y-14, vxt=vx, vyt=vy;
+                    ctx.beginPath(); ctx.moveTo(px,py);
+                    for(let s=0;s<35;s++){ px+=vxt; py+=vyt; vyt+=GRAVITY; if(py>GROUND_Y) break; ctx.lineTo(px,py); }
+                    ctx.strokeStyle='#ffcc77'; ctx.lineWidth=3.5; ctx.stroke();
                 }
             }
             for(let e of enemies) e.draw(ctx);
             for(let p of projectiles) p.draw(ctx);
-            for(let ef of effects) {
+            for(let ef of effects){
                 ctx.beginPath(); ctx.arc(ef.x, ef.y, ef.radius*ef.alpha, 0, Math.PI*2);
-                ctx.fillStyle = `rgba(255, 70, 20, ${ef.alpha*0.7})`; ctx.fill();
+                ctx.fillStyle=`rgba(255, 70, 20, ${ef.alpha*0.7})`; ctx.fill();
                 ctx.beginPath(); ctx.arc(ef.x, ef.y, ef.radius*0.55, 0, Math.PI*2);
-                ctx.fillStyle = `rgba(255, 210, 50, ${ef.alpha})`; ctx.fill();
+                ctx.fillStyle=`rgba(255, 210, 50, ${ef.alpha})`; ctx.fill();
             }
-            for(let pt of particles) {
+            for(let pt of particles){
                 ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size*pt.life, 0, Math.PI*2);
-                ctx.fillStyle = `rgba(255, 120, 30, ${pt.life*0.9})`; ctx.fill();
+                ctx.fillStyle=`rgba(255, 120, 30, ${pt.life*0.9})`; ctx.fill();
             }
-            if(!canShoot && gameActive) {
-                ctx.fillStyle = '#000000aa'; ctx.fillRect(CATAPULT_X-28, CATAPULT_Y-56, 56, 14);
+            if(!canShoot && gameActive){
+                ctx.fillStyle='#000000aa'; ctx.fillRect(CATAPULT_X-28, CATAPULT_Y-58, 56, 12);
                 let percent = shootCooldown/currentCooldownMax;
-                ctx.fillStyle = '#ffaa55'; ctx.fillRect(CATAPULT_X-28, CATAPULT_Y-56, 56*(1-percent), 12);
+                ctx.fillStyle='#ffaa55'; ctx.fillRect(CATAPULT_X-28, CATAPULT_Y-58, 56*(1-percent), 10);
             }
-            ctx.font = "bold 13px monospace"; ctx.fillStyle = "#fff6cf"; ctx.shadowBlur = 3;
-            ctx.fillText(`🏆 Апгрейды: +${extraDamage} урон / +${extraRadius} радиус`, CATAPULT_X-60, CATAPULT_Y-82);
+            ctx.font="bold 12px monospace"; ctx.fillStyle="#fff6cf"; ctx.shadowBlur=3;
+            ctx.fillText(`⚡ +${extraDamage} урон | +${extraRadius} радиус`, CATAPULT_X-60, CATAPULT_Y-84);
         }
         
-        function updateUI() {
+        function updateUI(){
             document.getElementById('baseHp').innerText = baseHealth;
             document.getElementById('score').innerText = Math.floor(score);
             document.getElementById('waveNum').innerText = waveNumber;
             document.getElementById('enemiesCount').innerText = enemies.length;
         }
-        
-        function gameOver() { gameActive = false; }
-        function restartGame() {
-            extraDamage=0; extraRadius=0; cooldownReduction=0; upgradeDmgLevel=upgradeCDLevel=upgradeRadLevel=0;
-            dmgPrice=90; cdPrice=80; radPrice=100; baseHealth=125; score=0; waveNumber=0;
-            enemies=[]; projectiles=[]; effects=[]; particles=[]; gameActive=true; waveInProgress=false; waveTransitionTimer=0;
+        function gameOver(){ gameActive=false; }
+        function restartGame(){
+            extraDamage=0; extraRadius=0; cooldownReduction=0;
+            upgradeDmgLevel=upgradeCDLevel=upgradeRadLevel=0;
+            dmgPrice=90; cdPrice=80; radPrice=100;
+            baseHealth=125; score=0; waveNumber=0;
+            enemies=[]; projectiles=[]; effects=[]; particles=[];
+            gameActive=true; waveInProgress=false; waveTransitionTimer=0;
             canShoot=true; shootCooldown=0;
-            updateStatsFromUpgrades(); updateUI();
+            updateStats(); updateUI();
+            hideUpgradeModal();
             startWave(0);
         }
         
-        // ---------- ВВОД ----------
-        function getCoords(e) {
+        // Управление: тянуть можно с любой точки, всегда рисуем линию от катапульты
+        function getCanvasCoords(e){
             const rect = canvas.getBoundingClientRect();
             let cx, cy;
-            if(e.touches) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
-            else { cx = e.clientX; cy = e.clientY; }
-            let x = (cx - rect.left) * scaleX, y = (cy - rect.top) * scaleY;
+            if(e.touches){ cx=e.touches[0].clientX; cy=e.touches[0].clientY; }
+            else { cx=e.clientX; cy=e.clientY; }
+            let x = (cx-rect.left)*scaleX;
+            let y = (cy-rect.top)*scaleY;
             return { mx: Math.min(canvas.width, Math.max(0,x)), my: Math.min(canvas.height, Math.max(0,y)) };
         }
-        function onPointerDown(e) { e.preventDefault(); if(!gameActive) return; initAudio(); const {mx,my}=getCoords(e); if(Math.hypot(mx-CATAPULT_X, my-(CATAPULT_Y-14))<48 && canShoot) { isDragging=true; dragCurrent={x:mx,y:my}; } }
-        function onPointerMove(e) { if(!isDragging) return; e.preventDefault(); const {mx,my}=getCoords(e); dragCurrent={x:mx,y:my}; }
-        function onPointerUp(e) { if(!isDragging) return; e.preventDefault(); if(gameActive && canShoot) shootFromCatapult(dragCurrent.x, dragCurrent.y); isDragging=false; }
-        canvas.addEventListener('mousedown', onPointerDown); window.addEventListener('mousemove', onPointerMove); window.addEventListener('mouseup', onPointerUp);
-        canvas.addEventListener('touchstart', onPointerDown, {passive:false}); window.addEventListener('touchmove', onPointerMove, {passive:false}); window.addEventListener('touchend', onPointerUp);
-        document.getElementById('restartBtn').addEventListener('click', () => { restartGame(); });
-        document.getElementById('upgradeDmg').addEventListener('click', () => applyUpgrade('dmg'));
-        document.getElementById('upgradeCooldown').addEventListener('click', () => applyUpgrade('cd'));
-        document.getElementById('upgradeRadius').addEventListener('click', () => applyUpgrade('rad'));
+        function onPointerDown(e){
+            e.preventDefault();
+            if(!gameActive) return;
+            initAudio();
+            const {mx,my} = getCanvasCoords(e);
+            // разрешаем прицел из любой точки, просто начинаем перетаскивание
+            if(canShoot && !modalVisible){
+                isDragging = true;
+                dragCurrent = { x: mx, y: my };
+            }
+        }
+        function onPointerMove(e){
+            if(!isDragging) return;
+            e.preventDefault();
+            const {mx,my} = getCanvasCoords(e);
+            dragCurrent = { x: mx, y: my };
+        }
+        function onPointerUp(e){
+            if(!isDragging) return;
+            e.preventDefault();
+            if(gameActive && canShoot && !modalVisible){
+                shootFromCatapult(dragCurrent.x, dragCurrent.y);
+            }
+            isDragging = false;
+        }
         
-        function gameLoop() { updateGame(); draw(); requestAnimationFrame(gameLoop); }
-        restartGame(); gameLoop(); updateCanvasScale();
+        canvas.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+        canvas.addEventListener('touchstart', onPointerDown, {passive:false});
+        window.addEventListener('touchmove', onPointerMove, {passive:false});
+        window.addEventListener('touchend', onPointerUp);
+        
+        document.getElementById('restartBtn').addEventListener('click', () => { restartGame(); });
+        document.getElementById('upgradeDmgModal').addEventListener('click', () => applyUpgradeFromModal('dmg'));
+        document.getElementById('upgradeCdModal').addEventListener('click', () => applyUpgradeFromModal('cd'));
+        document.getElementById('upgradeRadModal').addEventListener('click', () => applyUpgradeFromModal('rad'));
+        document.getElementById('closeUpgradeBtn').addEventListener('click', () => { if(modalVisible) hideUpgradeModal(); });
+        
+        function gameLoop(){
+            updateGame();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        updateStats();
+        restartGame();
+        gameLoop();
+        updateCanvasScale();
     })();
 </script>
 </body>
