@@ -44,10 +44,11 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(6px);
             border-radius: 24px;
             z-index: 20;
+            pointer-events: auto;   /* гарантируем, что оверлей получает касания */
         }
         .menu-card {
             text-align: center;
@@ -58,6 +59,7 @@
             box-shadow: 0 12px 28px black;
             color: #ffeaaf;
             min-width: 280px;
+            pointer-events: auto;
         }
         .menu-card h1 { font-size: 2.5rem; margin: 0 0 10px; text-shadow: 3px 3px 0 #7a4316; }
         .menu-card p { font-size: 1.1rem; margin: 12px 0; }
@@ -74,6 +76,8 @@
             cursor: pointer;
             box-shadow: 0 5px 0 #804e1a;
             transition: 0.05s linear;
+            touch-action: manipulation;
+            pointer-events: auto;
         }
         button:active { transform: translateY(3px); box-shadow: 0 2px 0 #804e1a; }
         .hidden { display: none; }
@@ -103,7 +107,7 @@
         <div class="menu-card">
             <h1>🏹 ЛУЧНИК 🏹</h1>
             <p>🐺 Враги преследуют тебя!<br>
-            🖱️ <strong>Мышь / палец</strong> → двигай лучника<br>
+            🖱️ <strong>Палец / мышь</strong> → двигай лучника<br>
             💥 <strong>ЗАЖМИ и ТЯНИ</strong> → натяжение лука<br>
             🎯 <strong>ОТПУСТИ</strong> → выстрел в сторону прицела</p>
             <p>➕ Уничтожай монстров — +1 очко<br>
@@ -129,7 +133,7 @@
         const W = 800, H = 600;
         const PLAYER_RADIUS = 18;
         
-        // ---------- ВРАГ (круг, преследует игрока) ----------
+        // ---------- ВРАГ ----------
         class Enemy {
             constructor(x, y, speed) {
                 this.x = x; this.y = y;
@@ -196,7 +200,6 @@
             update() {
                 this.x += this.vx;
                 this.y += this.vy;
-                // границы экрана (если улетела — удаляем)
                 if(this.x < -50 || this.x > W+50 || this.y < -50 || this.y > H+50) this.life = false;
             }
             draw(ctx) {
@@ -212,7 +215,6 @@
                 ctx.fill();
                 ctx.restore();
             }
-            // проверка попадания во врага (круг)
             hitsEnemy(enemy) {
                 return Math.hypot(this.x - enemy.x, this.y - enemy.y) < this.radius + enemy.radius;
             }
@@ -248,11 +250,9 @@
             constructor(x, y) {
                 this.x = x; this.y = y;
                 this.radius = PLAYER_RADIUS;
-                // состояние натяжения лука
                 this.charging = false;
                 this.chargeStartX = 0; this.chargeStartY = 0;
                 this.chargeCurrentX = 0; this.chargeCurrentY = 0;
-                this.chargeStrength = 0;   // 0..1
             }
             setPosition(clientX, clientY) {
                 let rect = canvas.getBoundingClientRect();
@@ -269,20 +269,12 @@
                 this.chargeStartY = clickCanvasY;
                 this.chargeCurrentX = clickCanvasX;
                 this.chargeCurrentY = clickCanvasY;
-                this.chargeStrength = 0;
             }
             updateCharge(currentCanvasX, currentCanvasY) {
                 if(!this.charging) return;
                 this.chargeCurrentX = currentCanvasX;
                 this.chargeCurrentY = currentCanvasY;
-                // сила натяжения = расстояние от начальной точки до текущей (нормируем до макс 80px)
-                let dx = currentCanvasX - this.chargeStartX;
-                let dy = currentCanvasY - this.chargeStartY;
-                let dist = Math.hypot(dx, dy);
-                let maxDist = 80;
-                this.chargeStrength = Math.min(1, dist / maxDist);
             }
-            // завершить натяжение: вернуть направление и силу (скорость стрелы)
             releaseCharge() {
                 if(!this.charging) return null;
                 let dx = this.chargeCurrentX - this.chargeStartX;
@@ -295,9 +287,8 @@
                 let dirX = dx / len;
                 let dirY = dy / len;
                 let strength = Math.min(1, len / 80);
-                let arrowSpeed = 6 + strength * 9; // от 6 до 15
+                let arrowSpeed = 6 + strength * 9;
                 this.charging = false;
-                // возвращаем данные для выстрела
                 return { dirX, dirY, speed: arrowSpeed, strength };
             }
             cancelCharge() {
@@ -307,7 +298,6 @@
                 ctx.save();
                 ctx.shadowBlur = 4;
                 ctx.shadowColor = "#1a1a1a";
-                // тело лучника (зелёный плащ)
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
                 ctx.fillStyle = "#578a5a";
@@ -316,7 +306,6 @@
                 ctx.beginPath();
                 ctx.arc(this.x-3, this.y-3, 6, 0, Math.PI*2);
                 ctx.fill();
-                // голова
                 ctx.fillStyle = "#eac88a";
                 ctx.beginPath();
                 ctx.ellipse(this.x, this.y-5, 12, 13, 0, 0, Math.PI*2);
@@ -329,7 +318,6 @@
                 ctx.arc(this.x+4, this.y-8, 2, 0, Math.PI*2);
                 ctx.fill();
                 
-                // ЛУК (рисуется всегда, а при натяжении показывает тетиву)
                 let angleToMouse = Math.atan2(mouseCanvasY - this.y, mouseCanvasX - this.x);
                 let bowX = this.x + Math.cos(angleToMouse) * 14;
                 let bowY = this.y + Math.sin(angleToMouse) * 12;
@@ -340,13 +328,11 @@
                 ctx.fillStyle = "#c9853c";
                 ctx.fillRect(bowX-2, bowY-4, 6, 12);
                 
-                // если идёт натяжение — рисуем тетиву и линию прицела
                 if(this.charging) {
                     let dx = this.chargeCurrentX - this.chargeStartX;
                     let dy = this.chargeCurrentY - this.chargeStartY;
                     let pullLen = Math.min(60, Math.hypot(dx, dy));
                     let strengthAlpha = Math.min(1, pullLen / 60);
-                    // тетива оттянута в сторону chargeCurrent
                     let tipX = bowX + (this.chargeCurrentX - bowX) * 0.5;
                     let tipY = bowY + (this.chargeCurrentY - bowY) * 0.5;
                     ctx.beginPath();
@@ -356,7 +342,6 @@
                     ctx.lineWidth = 3;
                     ctx.strokeStyle = `rgba(220, 180, 80, ${0.5+strengthAlpha*0.5})`;
                     ctx.stroke();
-                    // прицельная линия (от игрока в сторону натяжения)
                     ctx.beginPath();
                     ctx.moveTo(this.x, this.y);
                     let targetX = this.x + (this.chargeCurrentX - this.chargeStartX) * 2.5;
@@ -368,7 +353,6 @@
                     ctx.stroke();
                     ctx.setLineDash([]);
                 } else {
-                    // просто лук
                     ctx.beginPath();
                     ctx.moveTo(bowX - 8, bowY);
                     ctx.lineTo(bowX + 8, bowY);
@@ -454,10 +438,8 @@
             }
             updateGame(now, deltaMs) {
                 if(!this.gameActive) return;
-                // движение врагов
                 for(let e of this.enemies) e.update(this.player.x, this.player.y);
                 if(this.checkPlayerCollision()) return;
-                // обновление стрел и проверка попаданий
                 for(let i=0; i<this.arrows.length; i++) {
                     this.arrows[i].update();
                     if(!this.arrows[i].life) {
@@ -479,14 +461,12 @@
                         i--;
                     }
                 }
-                // спавн врагов
                 this.spawnTimer += deltaMs;
                 if(this.spawnTimer >= this.spawnDelay) {
                     this.spawnEnemy(now);
                     this.spawnTimer = 0;
                     this.spawnDelay = 1000 + Math.random() * 300;
                 }
-                // обновление эффектов
                 for(let i=0; i<this.effects.length; i++) {
                     this.effects[i].update();
                     if(this.effects[i].life <= 0) { this.effects.splice(i,1); i--; }
@@ -612,8 +592,19 @@
         canvas.addEventListener('mouseleave', onPointerLeave);
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         
-        document.getElementById('startBtn').addEventListener('click', () => game.resetAndStart());
-        document.getElementById('playAgainBtn').addEventListener('click', () => game.resetAndStart());
+        // Исправление для кнопок на мобильных устройствах
+        const startBtn = document.getElementById('startBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        
+        function startGameHandler(e) {
+            e.preventDefault();
+            game.resetAndStart();
+        }
+        
+        startBtn.addEventListener('click', startGameHandler);
+        startBtn.addEventListener('touchstart', startGameHandler, { passive: false });
+        playAgainBtn.addEventListener('click', startGameHandler);
+        playAgainBtn.addEventListener('touchstart', startGameHandler, { passive: false });
         
         game.gameActive = false;
         function drawStatic() {
