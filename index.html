@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Лучник | Натяни тетиву и стреляй</title>
+    <style>
+        * {
+            user-select: none;
+            touch-action: none;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 30%, #1a4f2e, #0a2a12);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'VT323', monospace;
+            overflow: hidden;
+        }
+        .game-wrapper {
+            position: relative;
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.6), inset 0 0 0 3px #e9c483;
+            border-radius: 32px;
+            background: #2a2418;
+            padding: 8px;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 24px;
+            cursor: crosshair;
+            background: #2f4d2d;
+            background-image: radial-gradient(circle at 15% 35%, rgba(70, 100, 50, 0.6) 2%, transparent 2.5%);
+            background-size: 32px 32px;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(6px);
+            border-radius: 24px;
+            z-index: 20;
+        }
+        .menu-card {
+            text-align: center;
+            background: #231f1a;
+            padding: 28px 36px;
+            border-radius: 60px;
+            border: 3px solid #f2bc6b;
+            box-shadow: 0 12px 28px black;
+            color: #ffeaaf;
+            min-width: 280px;
+        }
+        .menu-card h1 { font-size: 2.5rem; margin: 0 0 10px; text-shadow: 3px 3px 0 #7a4316; }
+        .menu-card p { font-size: 1.1rem; margin: 12px 0; }
+        button {
+            background: #e2933b;
+            border: none;
+            font-size: 1.6rem;
+            font-weight: bold;
+            font-family: monospace;
+            padding: 10px 32px;
+            margin-top: 12px;
+            border-radius: 48px;
+            color: #2c1e0c;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #804e1a;
+            transition: 0.05s linear;
+        }
+        button:active { transform: translateY(3px); box-shadow: 0 2px 0 #804e1a; }
+        .hidden { display: none; }
+        .info-tip {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 13px;
+            color: #fdebb3;
+            background: rgba(0,0,0,0.6);
+            width: fit-content;
+            margin: 0 auto;
+            padding: 5px 16px;
+            border-radius: 50px;
+            pointer-events: none;
+            z-index: 22;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper" style="width: 800px; height: 600px;">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="startScreen" class="overlay">
+        <div class="menu-card">
+            <h1>🏹 ЛУЧНИК 🏹</h1>
+            <p>🐺 Враги преследуют тебя!<br>
+            🖱️ <strong>Мышь / палец</strong> → двигай лучника<br>
+            💥 <strong>ЗАЖМИ и ТЯНИ</strong> → натяжение лука<br>
+            🎯 <strong>ОТПУСТИ</strong> → выстрел в сторону прицела</p>
+            <p>➕ Уничтожай монстров — +1 очко<br>
+            ⏫ Скорость врагов растёт каждые 30 сек</p>
+            <button id="startBtn">НАЧАТЬ ОХОТУ</button>
+        </div>
+    </div>
+    <div id="gameOverScreen" class="overlay hidden">
+        <div class="menu-card">
+            <h2>💀 GAME OVER 💀</h2>
+            <p>Ты был настигнут...</p>
+            <p>🏆 Счёт: <span id="finalScore">0</span></p>
+            <button id="playAgainBtn">НОВАЯ ИГРА</button>
+        </div>
+    </div>
+    <div class="info-tip">← двигай курсором | ЗАЖМИ → натяни лук → ОТПУСТИ → стреляй</div>
+</div>
+
+<script>
+    (function(){
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const W = 800, H = 600;
+        const PLAYER_RADIUS = 18;
+        
+        // ---------- ВРАГ (круг, преследует игрока) ----------
+        class Enemy {
+            constructor(x, y, speed) {
+                this.x = x; this.y = y;
+                this.radius = 18;
+                this.speed = speed;
+                this.color = '#c13b2b';
+            }
+            update(targetX, targetY) {
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const len = Math.hypot(dx, dy);
+                if(len > 0.01) {
+                    const move = Math.min(this.speed, len);
+                    this.x += (dx / len) * move;
+                    this.y += (dy / len) * move;
+                }
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = "rgba(0,0,0,0.5)";
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.fillStyle = "#8b1a1a";
+                ctx.beginPath();
+                ctx.arc(this.x-4, this.y-4, 5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "#ff5a3a";
+                ctx.beginPath();
+                ctx.arc(this.x+2, this.y-3, 3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "#f4e4b2";
+                ctx.beginPath();
+                ctx.arc(this.x-6, this.y-2, 3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x+4, this.y-2, 3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "#000";
+                ctx.beginPath();
+                ctx.arc(this.x-7, this.y-3, 1.5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x+3, this.y-3, 1.5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+            collidesWithPlayer(px, py, pr) {
+                return Math.hypot(this.x - px, this.y - py) < this.radius + pr;
+            }
+        }
+        
+        // ---------- СТРЕЛА ----------
+        class Arrow {
+            constructor(x, y, dirX, dirY, speed) {
+                this.x = x; this.y = y;
+                this.vx = dirX * speed;
+                this.vy = dirY * speed;
+                this.radius = 5;
+                this.life = true;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                // границы экрана (если улетела — удаляем)
+                if(this.x < -50 || this.x > W+50 || this.y < -50 || this.y > H+50) this.life = false;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.shadowBlur = 3;
+                ctx.fillStyle = "#eac46e";
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, 6, 3, Math.atan2(this.vy, this.vx), 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "#b87c2e";
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, 3, 2, Math.atan2(this.vy, this.vx), 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+            // проверка попадания во врага (круг)
+            hitsEnemy(enemy) {
+                return Math.hypot(this.x - enemy.x, this.y - enemy.y) < this.radius + enemy.radius;
+            }
+        }
+        
+        // ---------- ЭФФЕКТ ПОПАДАНИЯ ----------
+        class HitEffect {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.life = 8;
+                this.radius = 15;
+            }
+            update() { this.life--; }
+            draw(ctx) {
+                if(this.life <= 0) return;
+                const alpha = Math.min(0.9, (this.life / 6) * 0.8);
+                ctx.save();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * (1 - this.life/9), 0, Math.PI*2);
+                ctx.fillStyle = `rgba(255, 200, 60, ${alpha+0.3})`;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.5, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(255, 100, 40, ${alpha})`;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+        
+        // ---------- ИГРОК (лучник) ----------
+        class Player {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.radius = PLAYER_RADIUS;
+                // состояние натяжения лука
+                this.charging = false;
+                this.chargeStartX = 0; this.chargeStartY = 0;
+                this.chargeCurrentX = 0; this.chargeCurrentY = 0;
+                this.chargeStrength = 0;   // 0..1
+            }
+            setPosition(clientX, clientY) {
+                let rect = canvas.getBoundingClientRect();
+                let scaleX = canvas.width / rect.width;
+                let scaleY = canvas.height / rect.height;
+                let canvasX = (clientX - rect.left) * scaleX;
+                let canvasY = (clientY - rect.top) * scaleY;
+                this.x = Math.min(Math.max(canvasX, PLAYER_RADIUS + 5), W - PLAYER_RADIUS - 5);
+                this.y = Math.min(Math.max(canvasY, PLAYER_RADIUS + 15), H - PLAYER_RADIUS - 5);
+            }
+            startCharge(clickCanvasX, clickCanvasY) {
+                this.charging = true;
+                this.chargeStartX = clickCanvasX;
+                this.chargeStartY = clickCanvasY;
+                this.chargeCurrentX = clickCanvasX;
+                this.chargeCurrentY = clickCanvasY;
+                this.chargeStrength = 0;
+            }
+            updateCharge(currentCanvasX, currentCanvasY) {
+                if(!this.charging) return;
+                this.chargeCurrentX = currentCanvasX;
+                this.chargeCurrentY = currentCanvasY;
+                // сила натяжения = расстояние от начальной точки до текущей (нормируем до макс 80px)
+                let dx = currentCanvasX - this.chargeStartX;
+                let dy = currentCanvasY - this.chargeStartY;
+                let dist = Math.hypot(dx, dy);
+                let maxDist = 80;
+                this.chargeStrength = Math.min(1, dist / maxDist);
+            }
+            // завершить натяжение: вернуть направление и силу (скорость стрелы)
+            releaseCharge() {
+                if(!this.charging) return null;
+                let dx = this.chargeCurrentX - this.chargeStartX;
+                let dy = this.chargeCurrentY - this.chargeStartY;
+                let len = Math.hypot(dx, dy);
+                if(len < 0.01) {
+                    this.charging = false;
+                    return null;
+                }
+                let dirX = dx / len;
+                let dirY = dy / len;
+                let strength = Math.min(1, len / 80);
+                let arrowSpeed = 6 + strength * 9; // от 6 до 15
+                this.charging = false;
+                // возвращаем данные для выстрела
+                return { dirX, dirY, speed: arrowSpeed, strength };
+            }
+            cancelCharge() {
+                this.charging = false;
+            }
+            draw(ctx, mouseCanvasX, mouseCanvasY) {
+                ctx.save();
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = "#1a1a1a";
+                // тело лучника (зелёный плащ)
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = "#578a5a";
+                ctx.fill();
+                ctx.fillStyle = "#2c6533";
+                ctx.beginPath();
+                ctx.arc(this.x-3, this.y-3, 6, 0, Math.PI*2);
+                ctx.fill();
+                // голова
+                ctx.fillStyle = "#eac88a";
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y-5, 12, 13, 0, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "#232323";
+                ctx.beginPath();
+                ctx.arc(this.x-4, this.y-8, 2, 0, Math.PI*2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x+4, this.y-8, 2, 0, Math.PI*2);
+                ctx.fill();
+                
+                // ЛУК (рисуется всегда, а при натяжении показывает тетиву)
+                let angleToMouse = Math.atan2(mouseCanvasY - this.y, mouseCanvasX - this.x);
+                let bowX = this.x + Math.cos(angleToMouse) * 14;
+                let bowY = this.y + Math.sin(angleToMouse) * 12;
+                ctx.beginPath();
+                ctx.ellipse(bowX, bowY, 12, 6, angleToMouse, 0, Math.PI*2);
+                ctx.fillStyle = "#a5682a";
+                ctx.fill();
+                ctx.fillStyle = "#c9853c";
+                ctx.fillRect(bowX-2, bowY-4, 6, 12);
+                
+                // если идёт натяжение — рисуем тетиву и линию прицела
+                if(this.charging) {
+                    let dx = this.chargeCurrentX - this.chargeStartX;
+                    let dy = this.chargeCurrentY - this.chargeStartY;
+                    let pullLen = Math.min(60, Math.hypot(dx, dy));
+                    let strengthAlpha = Math.min(1, pullLen / 60);
+                    // тетива оттянута в сторону chargeCurrent
+                    let tipX = bowX + (this.chargeCurrentX - bowX) * 0.5;
+                    let tipY = bowY + (this.chargeCurrentY - bowY) * 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(bowX - 8, bowY);
+                    ctx.lineTo(tipX, tipY);
+                    ctx.lineTo(bowX + 8, bowY);
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = `rgba(220, 180, 80, ${0.5+strengthAlpha*0.5})`;
+                    ctx.stroke();
+                    // прицельная линия (от игрока в сторону натяжения)
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    let targetX = this.x + (this.chargeCurrentX - this.chargeStartX) * 2.5;
+                    let targetY = this.y + (this.chargeCurrentY - this.chargeStartY) * 2.5;
+                    ctx.lineTo(targetX, targetY);
+                    ctx.setLineDash([8, 6]);
+                    ctx.strokeStyle = `rgba(255, 220, 100, ${0.7})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                } else {
+                    // просто лук
+                    ctx.beginPath();
+                    ctx.moveTo(bowX - 8, bowY);
+                    ctx.lineTo(bowX + 8, bowY);
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "#d69c4a";
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+        
+        // ---------- ГЛАВНЫЙ КЛАСС ИГРЫ ----------
+        class Game {
+            constructor() {
+                this.player = null;
+                this.enemies = [];
+                this.arrows = [];
+                this.effects = [];
+                this.score = 0;
+                this.gameActive = false;
+                this.startTime = 0;
+                this.currentTimeSec = 0;
+                this.animationId = null;
+                this.spawnTimer = 0;
+                this.spawnDelay = 1100;
+                this.lastFrameTime = 0;
+                this.speedBonus = 0;
+                this.currentMouseCanvas = { x: W/2, y: H/2 };
+            }
+            init() {
+                this.player = new Player(W/2, H - 70);
+                this.enemies = [];
+                this.arrows = [];
+                this.effects = [];
+                this.score = 0;
+                this.gameActive = true;
+                this.speedBonus = 0;
+                const now = performance.now();
+                this.startTime = now;
+                this.spawnTimer = 0;
+                this.lastFrameTime = now;
+                this.updateUI();
+            }
+            updateUI() {
+                document.getElementById('finalScore').innerText = this.score;
+            }
+            addScore(inc, x, y) {
+                this.score += inc;
+                this.updateUI();
+                this.effects.push(new HitEffect(x, y));
+            }
+            spawnEnemy(now) {
+                const elapsedSec = (now - this.startTime) / 1000;
+                let bonus = Math.floor(elapsedSec / 30) * 0.55;
+                if(bonus > 3.8) bonus = 3.8;
+                this.speedBonus = bonus;
+                let baseSpeed = 1.2 + Math.random() * 2.0;
+                let finalSpeed = Math.min(baseSpeed + this.speedBonus, 8.2);
+                let side = Math.floor(Math.random() * 4);
+                let x, y;
+                if(side === 0) { x = 30 + Math.random() * (W - 60); y = -20; }
+                else if(side === 1) { x = -20; y = 40 + Math.random() * (H - 100); }
+                else if(side === 2) { x = W + 20; y = 40 + Math.random() * (H - 100); }
+                else { x = 30 + Math.random() * (W - 60); y = H + 20; }
+                x = Math.min(Math.max(x, -10), W+10);
+                y = Math.min(Math.max(y, -10), H+20);
+                this.enemies.push(new Enemy(x, y, finalSpeed));
+            }
+            checkPlayerCollision() {
+                if(!this.gameActive) return true;
+                for(let e of this.enemies) {
+                    if(e.collidesWithPlayer(this.player.x, this.player.y, this.player.radius)) {
+                        this.gameActive = false;
+                        this.showGameOver();
+                        return true;
+                    }
+                }
+                return false;
+            }
+            shootArrow(dirX, dirY, speed) {
+                let arrow = new Arrow(this.player.x, this.player.y, dirX, dirY, speed);
+                this.arrows.push(arrow);
+            }
+            updateGame(now, deltaMs) {
+                if(!this.gameActive) return;
+                // движение врагов
+                for(let e of this.enemies) e.update(this.player.x, this.player.y);
+                if(this.checkPlayerCollision()) return;
+                // обновление стрел и проверка попаданий
+                for(let i=0; i<this.arrows.length; i++) {
+                    this.arrows[i].update();
+                    if(!this.arrows[i].life) {
+                        this.arrows.splice(i,1);
+                        i--; continue;
+                    }
+                    let hitIndex = -1;
+                    for(let j=0; j<this.enemies.length; j++) {
+                        if(this.arrows[i].hitsEnemy(this.enemies[j])) {
+                            hitIndex = j;
+                            break;
+                        }
+                    }
+                    if(hitIndex !== -1) {
+                        let enemy = this.enemies[hitIndex];
+                        this.addScore(1, enemy.x, enemy.y);
+                        this.enemies.splice(hitIndex,1);
+                        this.arrows.splice(i,1);
+                        i--;
+                    }
+                }
+                // спавн врагов
+                this.spawnTimer += deltaMs;
+                if(this.spawnTimer >= this.spawnDelay) {
+                    this.spawnEnemy(now);
+                    this.spawnTimer = 0;
+                    this.spawnDelay = 1000 + Math.random() * 300;
+                }
+                // обновление эффектов
+                for(let i=0; i<this.effects.length; i++) {
+                    this.effects[i].update();
+                    if(this.effects[i].life <= 0) { this.effects.splice(i,1); i--; }
+                }
+                if(this.startTime) this.currentTimeSec = (now - this.startTime) / 1000;
+            }
+            draw() {
+                ctx.clearRect(0, 0, W, H);
+                ctx.fillStyle = "#3a6b3c";
+                ctx.fillRect(0, 0, W, H);
+                for(let i=0;i<180;i++) {
+                    ctx.fillStyle = `rgba(100,140,70,${Math.random()*0.3})`;
+                    ctx.fillRect(i*43 % W, (i*17) % H, 4, 4);
+                }
+                for(let e of this.enemies) e.draw(ctx);
+                for(let a of this.arrows) a.draw(ctx);
+                for(let ef of this.effects) ef.draw(ctx);
+                if(this.player) this.player.draw(ctx, this.currentMouseCanvas.x, this.currentMouseCanvas.y);
+                
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillStyle = "#FFF2C9";
+                ctx.shadowBlur = 3;
+                ctx.fillText(`🏹 ${this.score}`, 22, 52);
+                let minutes = Math.floor(this.currentTimeSec / 60);
+                let seconds = Math.floor(this.currentTimeSec % 60);
+                let timeStr = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+                ctx.fillStyle = "#FFE9A7";
+                ctx.fillText(`⏱️ ${timeStr}`, W-150, 52);
+                if(this.gameActive) {
+                    ctx.font = "bold 14px monospace";
+                    ctx.fillStyle = "#f3cb7a";
+                    ctx.fillText(`скорость +${this.speedBonus.toFixed(1)}`, W-145, H-14);
+                }
+                ctx.shadowBlur = 0;
+            }
+            showGameOver() {
+                this.gameActive = false;
+                if(this.animationId) cancelAnimationFrame(this.animationId);
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+                document.getElementById('finalScore').innerText = this.score;
+            }
+            resetAndStart() {
+                document.getElementById('startScreen').classList.add('hidden');
+                document.getElementById('gameOverScreen').classList.add('hidden');
+                this.init();
+                if(this.animationId) cancelAnimationFrame(this.animationId);
+                this.lastFrameTime = performance.now();
+                this.gameLoop(this.lastFrameTime);
+            }
+            gameLoop(now) {
+                if(!this.gameActive) { this.draw(); return; }
+                if(!this.lastFrameTime) this.lastFrameTime = now;
+                let delta = Math.min(100, now - this.lastFrameTime);
+                if(delta < 0) delta = 16;
+                this.lastFrameTime = now;
+                this.updateGame(now, delta);
+                this.draw();
+                this.animationId = requestAnimationFrame((t) => this.gameLoop(t));
+            }
+        }
+        
+        // ---------- УПРАВЛЕНИЕ ----------
+        const game = new Game();
+        let isPointerDown = false;
+        
+        function handleMove(clientX, clientY) {
+            if(game.gameActive && game.player) game.player.setPosition(clientX, clientY);
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (clientX - rect.left) * scaleX;
+            let canvasY = (clientY - rect.top) * scaleY;
+            canvasX = Math.min(Math.max(canvasX, 0), W);
+            canvasY = Math.min(Math.max(canvasY, 0), H);
+            game.currentMouseCanvas = { x: canvasX, y: canvasY };
+            if(isPointerDown && game.gameActive && game.player) {
+                game.player.updateCharge(canvasX, canvasY);
+            }
+        }
+        
+        function onPointerDown(e) {
+            e.preventDefault();
+            if(!game.gameActive) return;
+            let clientX, clientY;
+            if(e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+            else { clientX = e.clientX; clientY = e.clientY; }
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (clientX - rect.left) * scaleX;
+            let canvasY = (clientY - rect.top) * scaleY;
+            isPointerDown = true;
+            game.player.startCharge(canvasX, canvasY);
+        }
+        
+        function onPointerUp(e) {
+            e.preventDefault();
+            if(!isPointerDown) return;
+            isPointerDown = false;
+            if(!game.gameActive) {
+                if(game.player) game.player.cancelCharge();
+                return;
+            }
+            let chargeData = game.player.releaseCharge();
+            if(chargeData) {
+                game.shootArrow(chargeData.dirX, chargeData.dirY, chargeData.speed);
+            }
+        }
+        
+        function onPointerLeave() {
+            if(isPointerDown) {
+                isPointerDown = false;
+                if(game.player) game.player.cancelCharge();
+            }
+        }
+        
+        canvas.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+        canvas.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mouseup', onPointerUp);
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if(e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+        canvas.addEventListener('touchstart', onPointerDown, {passive: false});
+        window.addEventListener('touchend', onPointerUp);
+        canvas.addEventListener('mouseleave', onPointerLeave);
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        
+        document.getElementById('startBtn').addEventListener('click', () => game.resetAndStart());
+        document.getElementById('playAgainBtn').addEventListener('click', () => game.resetAndStart());
+        
+        game.gameActive = false;
+        function drawStatic() {
+            ctx.fillStyle = '#2d4a2a';
+            ctx.fillRect(0,0,W,H);
+            ctx.font = "bold 28px monospace";
+            ctx.fillStyle = "#eac084";
+            ctx.fillText("🏹 Лучник", W/2-90, H/2-40);
+            ctx.font = "18px monospace";
+            ctx.fillStyle = "#fbdd99";
+            ctx.fillText("Нажми СТАРТ, чтобы выйти на охоту", W/2-210, H/2+25);
+        }
+        drawStatic();
+    })();
+</script>
+</body>
+</html>
