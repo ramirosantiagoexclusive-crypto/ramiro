@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Treasure Catcher</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: linear-gradient(145deg, #0a2f3a 0%, #07323f 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 64px;
+            padding: 20px 25px 25px 25px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255,255,255,0.1);
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 36px;
+            box-shadow: 0 12px 28px black, inset 0 0 0 2px rgba(255,215,0,0.3);
+            cursor: none;
+            background: radial-gradient(circle at 30% 20%, #1a4e5e, #0a2f3a);
+            width: 100%;
+            height: auto;
+        }
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 18px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 15px;
+            background: #1e2f32c9;
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 60px;
+            color: #f9e7b3;
+            text-shadow: 0 2px 3px black;
+        }
+        .stats {
+            display: flex;
+            gap: 32px;
+            font-weight: bold;
+        }
+        .stat {
+            background: #010e13a0;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 1.3rem;
+            font-weight: 800;
+            backdrop-filter: blur(4px);
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+        }
+        .stat span:first-child {
+            font-size: 0.85rem;
+            font-weight: normal;
+            opacity: 0.9;
+        }
+        .stat span:last-child {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffd966;
+        }
+        .lives {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #010e13a0;
+            padding: 5px 18px;
+            border-radius: 50px;
+        }
+        .life-box {
+            width: 26px;
+            height: 26px;
+            background-color: #e34234;
+            border-radius: 5px;
+            box-shadow: 0 0 3px darkred;
+        }
+        .life-box.lost {
+            background-color: #4a2a2a;
+            opacity: 0.5;
+        }
+        button {
+            background: #f5bc70;
+            border: none;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 1.1rem;
+            padding: 6px 20px;
+            border-radius: 60px;
+            color: #1e2a2e;
+            cursor: pointer;
+            transition: 0.1s linear;
+            box-shadow: 0 4px 0 #8b5a2b;
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #8b5a2b;
+        }
+        .instruction {
+            font-size: 0.75rem;
+            background: #00000066;
+            border-radius: 40px;
+            padding: 5px 14px;
+        }
+        @media (max-width: 860px) {
+            .stat span:last-child { font-size: 1.4rem; }
+            .life-box { width: 22px; height: 22px; }
+            button { font-size: 1rem; padding: 4px 16px; }
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="900" height="550" style="width:100%; height:auto; max-width:900px; aspect-ratio:900/550"></canvas>
+        <div class="info-panel">
+            <div class="stats">
+                <div class="stat"><span>SCORE</span> <span id="scoreValue">0</span></div>
+                <div class="stat"><span>BEST</span> <span id="highScoreValue">0</span></div>
+            </div>
+            <div class="lives" id="livesDisplay"></div>
+            <button id="restartButton">NEW GAME</button>
+            <div class="instruction">Mouse / finger > move basket</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('scoreValue');
+        const highScoreSpan = document.getElementById('highScoreValue');
+        const livesContainer = document.getElementById('livesDisplay');
+        const restartBtn = document.getElementById('restartButton');
+
+        let gameRunning = true;
+        let score = 0;
+        let lives = 3;
+        let highScore = 0;
+
+        try {
+            const saved = localStorage.getItem('treasureCatchHigh');
+            if(saved && !isNaN(parseInt(saved))) highScore = parseInt(saved);
+            highScoreSpan.innerText = highScore;
+        } catch(e) {}
+
+        let items = [];
+
+        const BASKET_W = 100;
+        const BASKET_H = 28;
+        let basketX = (canvas.width - BASKET_W) / 2;
+
+        let lastSpawnTime = 0;
+
+        function getSpawnInterval(score) {
+            let interval = 880 - Math.min(580, Math.floor(score / 1.2));
+            return Math.max(290, Math.min(880, interval));
+        }
+
+        function getFallSpeed(score) {
+            let spd = 2.2 + (score / 170);
+            return Math.min(6.7, spd);
+        }
+
+        function spawnItem() {
+            if (!gameRunning) return;
+            const isCoin = Math.random() < 0.68;
+            const radius = isCoin ? 13 : 14;
+            const x = Math.random() * (canvas.width - radius * 2) + radius;
+            const y = -radius - Math.random() * 15;
+            items.push({
+                x: x, y: y, radius: radius,
+                type: isCoin ? 'coin' : 'bomb'
+            });
+        }
+
+        function updateItemsAndCollision() {
+            if (!gameRunning) return;
+            const speed = getFallSpeed(score);
+            for (let i = items.length-1; i >= 0; i--) {
+                const item = items[i];
+                item.y += speed;
+
+                const basketTop = canvas.height - BASKET_H;
+                const basketLeft = basketX;
+                const basketRight = basketX + BASKET_W;
+
+                if (item.y + item.radius >= basketTop && item.y - item.radius <= basketTop + BASKET_H) {
+                    if (item.x + item.radius > basketLeft && item.x - item.radius < basketRight) {
+                        if (item.type === 'coin') {
+                            score++;
+                            updateScoreUI();
+                            if (score > highScore) {
+                                highScore = score;
+                                highScoreSpan.innerText = highScore;
+                                try { localStorage.setItem('treasureCatchHigh', highScore); } catch(e) {}
+                            }
+                        } else {
+                            lives--;
+                            updateLivesUI();
+                            if (lives <= 0) {
+                                gameRunning = false;
+                                lives = 0;
+                                updateLivesUI();
+                            }
+                        }
+                        items.splice(i,1);
+                        continue;
+                    }
+                }
+                if (item.y + item.radius > canvas.height + 60 || item.y + item.radius < -100) {
+                    items.splice(i,1);
+                }
+            }
+        }
+
+        function updateScoreUI() {
+            scoreSpan.innerText = score;
+            if (score > highScore) {
+                highScore = score;
+                highScoreSpan.innerText = highScore;
+                try { localStorage.setItem('treasureCatchHigh', highScore); } catch(e) {}
+            }
+        }
+
+        function updateLivesUI() {
+            livesContainer.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const div = document.createElement('div');
+                div.className = 'life-box' + (i >= lives ? ' lost' : '');
+                livesContainer.appendChild(div);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for(let i = 0; i < 80; i++) {
+                ctx.beginPath();
+                ctx.arc( (i*47)%canvas.width, (canvas.height*0.7 + Math.sin(i)*6), 1.5, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255,250,210,0.12)';
+                ctx.fill();
+            }
+            
+            for (let item of items) {
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = 'rgba(0,0,0,0.4)';
+                if (item.type === 'coin') {
+                    const grad = ctx.createRadialGradient(item.x-4, item.y-4, 3, item.x, item.y, item.radius);
+                    grad.addColorStop(0, '#FFE484');
+                    grad.addColorStop(1, '#D4A017');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, item.radius, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#B8860B';
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, item.radius-3, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, item.radius-5, 0, Math.PI*2);
+                    ctx.fill();
+                } 
+                else {
+                    const grad = ctx.createRadialGradient(item.x-3, item.y-3, 3, item.x, item.y, item.radius);
+                    grad.addColorStop(0, '#8B3A3A');
+                    grad.addColorStop(1, '#4A0000');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, item.radius, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#1A0000';
+                    ctx.moveTo(item.x - 8, item.y - 8);
+                    ctx.lineTo(item.x + 8, item.y + 8);
+                    ctx.moveTo(item.x + 8, item.y - 8);
+                    ctx.lineTo(item.x - 8, item.y + 8);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, 5, 0, Math.PI*2);
+                    ctx.fillStyle = '#2F0A0A';
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
+            }
+            
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = '#B87C4F';
+            ctx.fillRect(basketX, canvas.height-BASKET_H, BASKET_W, BASKET_H);
+            ctx.fillStyle = '#DAA06D';
+            ctx.fillRect(basketX+5, canvas.height-BASKET_H-6, BASKET_W-10, 8);
+            ctx.fillStyle = '#9C5A2C';
+            ctx.fillRect(basketX+2, canvas.height-BASKET_H-3, BASKET_W-4, 6);
+            ctx.beginPath();
+            ctx.moveTo(basketX+15, canvas.height-BASKET_H-8);
+            ctx.lineTo(basketX+25, canvas.height-BASKET_H-18);
+            ctx.lineTo(basketX+35, canvas.height-BASKET_H-8);
+            ctx.fillStyle = '#C57F3A';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(basketX+BASKET_W-15, canvas.height-BASKET_H-8);
+            ctx.lineTo(basketX+BASKET_W-25, canvas.height-BASKET_H-18);
+            ctx.lineTo(basketX+BASKET_W-35, canvas.height-BASKET_H-8);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            if (!gameRunning) {
+                ctx.font = 'bold 40px "Arial", "Verdana", sans-serif';
+                ctx.fillStyle = '#FFCC66';
+                ctx.shadowColor = 'black';
+                ctx.fillText('GAME OVER', canvas.width/2-105, canvas.height/2-40);
+                ctx.font = '20px "Arial", sans-serif';
+                ctx.fillStyle = '#FFE0A3';
+                ctx.fillText('press NEW GAME', canvas.width/2-78, canvas.height/2+30);
+            }
+            
+            ctx.strokeStyle = '#FFE0A0';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(5, 5, canvas.width-10, canvas.height-10);
+        }
+
+        function handleMove(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            let canvasX = (clientX - rect.left) * scaleX;
+            canvasX = Math.min(Math.max(canvasX, 0), canvas.width);
+            let newX = canvasX - BASKET_W/2;
+            newX = Math.min(Math.max(newX, 0), canvas.width - BASKET_W);
+            basketX = newX;
+        }
+
+        function onMouseMove(e) { handleMove(e.clientX, e.clientY); }
+        function onTouchMove(e) { e.preventDefault(); if(e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY); }
+        function onTouchStart(e) { e.preventDefault(); if(e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY); }
+
+        let animFrame = null;
+        function gameLoop(now) {
+            if (!animFrame) return;
+            if (gameRunning) {
+                const spawnDelay = getSpawnInterval(score);
+                if (lastSpawnTime === 0) lastSpawnTime = now;
+                if (now - lastSpawnTime >= spawnDelay) {
+                    spawnItem();
+                    lastSpawnTime = now;
+                }
+                updateItemsAndCollision();
+                if (lives <= 0) gameRunning = false;
+            }
+            draw();
+            animFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function restartGame() {
+            gameRunning = true;
+            score = 0;
+            lives = 3;
+            items = [];
+            basketX = (canvas.width - BASKET_W) / 2;
+            lastSpawnTime = 0;
+            updateScoreUI();
+            updateLivesUI();
+            highScoreSpan.innerText = highScore;
+        }
+
+        function init() {
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            restartBtn.addEventListener('click', () => restartGame());
+            updateLivesUI();
+            updateScoreUI();
+            restartGame(); 
+            animFrame = requestAnimationFrame(gameLoop);
+        }
+        
+        init();
+    })();
+</script>
+</body>
+</html>
