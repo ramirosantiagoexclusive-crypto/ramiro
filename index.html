@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Лучник: HitZones и стрелы</title>
+    <title>Лучник: HitZones | GitHub Pages версия</title>
     <style>
         body {
             margin: 0;
@@ -134,7 +134,8 @@
             .upgrade-btn { font-size: 0.7rem; padding: 5px 12px; }
         }
     </style>
-    <script src="libs/pixi.min.js"></script>
+    <!-- Используем CDN, чтобы не было проблем с локальными файлами -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 </head>
 <body>
 <div id="gameContainer">
@@ -159,6 +160,12 @@
 
 <script>
     (function() {
+        // Проверка загрузки PixiJS
+        if (typeof PIXI === 'undefined') {
+            document.body.innerHTML = '<div style="color:red; text-align:center; margin-top:50px;">Ошибка: PixiJS не загрузился. Проверьте интернет-соединение или замените ссылку на библиотеку.</div>';
+            return;
+        }
+
         // ---------- PixiJS setup ----------
         const container = document.getElementById('gameContainer');
         const app = new PIXI.Application({
@@ -171,7 +178,7 @@
         });
         container.appendChild(app.view);
 
-        // Уменьшенный мир для лучшей видимости на телефонах
+        // Размеры мира (уменьшены для мобильных)
         const WORLD_W = 900;
         const WORLD_H = 500;
         const GROUND_Y = 430;
@@ -266,7 +273,7 @@
         }
         drawBackground();
 
-        // Класс врага (с зонами)
+        // Класс врага
         class Enemy extends PIXI.Sprite {
             constructor(type, hp, speed, reward, radius, hasShield, hasHelmet) {
                 let tex = texFootman;
