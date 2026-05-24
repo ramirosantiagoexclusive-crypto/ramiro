@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Лучник: HitZones | GitHub Pages версия</title>
+    <title>Лучник: HitZones — Идеально для телефона</title>
     <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
         body {
             margin: 0;
             overflow: hidden;
-            background: #0a1f0a;
-            font-family: 'Segoe UI', system-ui, monospace;
+            background: #0a2a0a;
+            font-family: 'Segoe UI', system-ui, -apple-system, 'Roboto', sans-serif;
             touch-action: none;
         }
         #gameContainer {
@@ -24,78 +28,46 @@
         }
         .ui-panel {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
+            top: 12px;
+            left: 12px;
+            right: 12px;
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 8px;
             background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(8px);
-            padding: 6px 12px;
-            border-radius: 40px;
-            color: #f9eec1;
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 50px;
+            color: #ffefcf;
             pointer-events: none;
-            z-index: 10;
-            font-size: 0.8rem;
+            z-index: 15;
+            font-size: 0.9rem;
             font-weight: bold;
+            letter-spacing: 0.5px;
         }
         .stat span {
-            color: #ffcf7a;
-            font-size: 1.1rem;
+            color: #ffcd7e;
+            font-size: 1.2rem;
             margin-right: 4px;
         }
         .restart-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #b87a3c;
+            top: 12px;
+            right: 12px;
+            background: #c4843a;
             border: none;
-            padding: 4px 12px;
-            border-radius: 30px;
+            padding: 6px 14px;
+            border-radius: 40px;
             color: white;
             font-weight: bold;
             cursor: pointer;
             pointer-events: auto;
             z-index: 20;
-            font-family: monospace;
-            font-size: 0.7rem;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
         .arrow-selector {
-            position: absolute;
-            bottom: 80px;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(8px);
-            padding: 6px;
-            border-radius: 50px;
-            width: fit-content;
-            margin: 0 auto;
-            pointer-events: auto;
-            z-index: 20;
-        }
-        .arrow-btn {
-            background: #2e241a;
-            border: 1px solid #cf9f4a;
-            color: #ffecb3;
-            font-size: 0.7rem;
-            padding: 4px 12px;
-            border-radius: 30px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.1s;
-        }
-        .arrow-btn.active {
-            background: #da943a;
-            color: #1e1507;
-            border-color: #ffd58c;
-        }
-        .upgrade-panel {
             position: absolute;
             bottom: 20px;
             left: 0;
@@ -103,38 +75,97 @@
             display: flex;
             justify-content: center;
             gap: 12px;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.65);
             backdrop-filter: blur(12px);
-            padding: 10px 16px;
-            border-radius: 50px;
-            border: 1px solid #ffd966;
-            transform: translateY(150%);
-            transition: transform 0.3s;
-            z-index: 25;
+            padding: 8px 16px;
+            border-radius: 60px;
+            width: fit-content;
+            margin: 0 auto;
             pointer-events: auto;
+            z-index: 20;
+            border: 1px solid #dba549;
+        }
+        .arrow-btn {
+            background: #2e241a;
+            border: none;
+            color: #ffefc0;
+            font-size: 0.85rem;
+            font-weight: bold;
+            padding: 8px 18px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.1s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        .arrow-btn.active {
+            background: #e09d3e;
+            color: #1f180a;
+            box-shadow: 0 0 6px #ffbb66;
+        }
+        /* Улучшенная панель апгрейдов — по центру экрана, крупная */
+        .upgrade-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            padding: 24px 30px;
+            border-radius: 56px;
+            border: 2px solid #ffbe5e;
+            z-index: 30;
+            pointer-events: auto;
+            opacity: 0;
+            visibility: hidden;
+            transition: 0.2s ease;
+            min-width: 220px;
+            align-items: stretch;
         }
         .upgrade-panel.show {
-            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
         }
         .upgrade-btn {
-            background: #da943a;
+            background: #e09d3e;
             border: none;
-            font-size: 0.8rem;
+            font-size: 1.1rem;
             font-weight: bold;
-            padding: 6px 14px;
-            border-radius: 30px;
-            color: #1e1507;
+            padding: 12px 24px;
+            border-radius: 60px;
+            color: #241d0a;
             cursor: pointer;
-            box-shadow: 0 2px 0 #754a1a;
+            box-shadow: 0 3px 0 #754a1a;
+            margin: 4px 0;
+        }
+        .upgrade-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #754a1a;
+        }
+        .touch-hint {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #ddd;
+            pointer-events: none;
+            z-index: 15;
         }
         @media (max-width: 700px) {
-            .ui-panel { font-size: 0.7rem; padding: 4px 10px; }
+            .ui-panel { font-size: 0.7rem; padding: 5px 12px; top: 8px; left: 8px; right: 8px; }
             .stat span { font-size: 1rem; }
-            .arrow-btn { font-size: 0.65rem; padding: 3px 10px; }
-            .upgrade-btn { font-size: 0.7rem; padding: 5px 12px; }
+            .arrow-btn { font-size: 0.7rem; padding: 6px 14px; }
+            .upgrade-btn { font-size: 0.9rem; padding: 10px 20px; }
+            .touch-hint { font-size: 0.6rem; bottom: 80px; }
         }
     </style>
-    <!-- Используем CDN, чтобы не было проблем с локальными файлами -->
+    <!-- PixiJS из CDN (надёжно) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 </head>
 <body>
@@ -156,17 +187,12 @@
         <button class="upgrade-btn" id="upgradeCrit">🎯 Крит +10%</button>
         <button class="upgrade-btn" id="upgradeSpeed">⚡ Скорострельность</button>
     </div>
+    <div class="touch-hint">✨ Тяни пальцем в любом месте → прицел → отпусти</div>
 </div>
 
 <script>
     (function() {
-        // Проверка загрузки PixiJS
-        if (typeof PIXI === 'undefined') {
-            document.body.innerHTML = '<div style="color:red; text-align:center; margin-top:50px;">Ошибка: PixiJS не загрузился. Проверьте интернет-соединение или замените ссылку на библиотеку.</div>';
-            return;
-        }
-
-        // ---------- PixiJS setup ----------
+        // ---------- PixiJS сцена ----------
         const container = document.getElementById('gameContainer');
         const app = new PIXI.Application({
             width: window.innerWidth,
@@ -178,7 +204,7 @@
         });
         container.appendChild(app.view);
 
-        // Размеры мира (уменьшены для мобильных)
+        // Размеры виртуального мира (адаптировано для телефона)
         const WORLD_W = 900;
         const WORLD_H = 500;
         const GROUND_Y = 430;
@@ -203,7 +229,7 @@
         let extraDamage = 0;
         let baseCritChance = 0.15;
         let extraCrit = 0;
-        let baseCooldown = 28;
+        let baseCooldown = 26;
         let cooldownReduction = 0;
         let currentDamage, currentCrit, currentCooldown;
 
@@ -273,7 +299,7 @@
         }
         drawBackground();
 
-        // Класс врага
+        // Класс врага (hit zones)
         class Enemy extends PIXI.Sprite {
             constructor(type, hp, speed, reward, radius, hasShield, hasHelmet) {
                 let tex = texFootman;
@@ -404,9 +430,7 @@
                 for (let i = 0; i < enemies.length; i++) {
                     const e = enemies[i];
                     if (!e.alive) continue;
-                    const dx = this.sprite.x - e.x;
-                    const dy = this.sprite.y - e.y;
-                    if (Math.hypot(dx, dy) < e.radius + 5) {
+                    if (Math.hypot(this.sprite.x - e.x, this.sprite.y - e.y) < e.radius + 5) {
                         const zone = e.getHitZone(this.sprite.x, this.sprite.y);
                         let damage = currentDamage;
                         if (this.type === 'pierce') damage = currentDamage + 10;
@@ -424,6 +448,7 @@
             }
         }
 
+        // Визуальные эффекты
         function showDamageNumber(x, y, dmg, crit) {
             const text = new PIXI.Text(`${dmg}${crit ? ' CRIT!' : ''}`, { fontSize: 12, fill: crit ? 0xff8888 : 0xffdd99, stroke: '#000', strokeThickness: 1 });
             text.x = x;
@@ -440,7 +465,6 @@
                 }
             }, 20);
         }
-
         function createHitEffect(x, y) {
             const g = new PIXI.Graphics();
             g.beginFill(0xffaa66);
@@ -459,6 +483,7 @@
             }, 30);
         }
 
+        // Звуки (синтез, только после касания)
         let audioCtx = null;
         function playSound(type) {
             if (!audioCtx) return;
@@ -485,7 +510,7 @@
             } catch(e) {}
         }
 
-        // Генерация волн
+        // Волны
         function generateWave(waveIdx) {
             const count = 3 + Math.floor(waveIdx * 0.6) + Math.floor(Math.random() * 2);
             const types = ['footman', 'heavy', 'swift'];
@@ -507,7 +532,6 @@
             }
             return list;
         }
-
         function buildSpawnQueue(waveIdx) {
             const comp = generateWave(waveIdx);
             const queue = [];
@@ -548,9 +572,7 @@
             waveActive = true;
             waveTransition = 0;
             document.getElementById('waveNum').innerText = waveIdx;
-            playSound('shoot');
         }
-
         function updateWave() {
             if (!gameActive) return;
             if (waveTransition > 0) {
@@ -576,7 +598,6 @@
                     updateUI();
                     waveTransition = 45;
                     showUpgradePanel();
-                    playSound('shoot');
                 }
             }
         }
@@ -593,6 +614,7 @@
             startWave(wave);
         }
 
+        // Выстрел
         function shoot(targetX, targetY) {
             if (!gameActive || !canShoot) return false;
             let dx = targetX - ARCHER_X;
@@ -665,7 +687,7 @@
             hideUpgradePanel();
         }
 
-        // Управление
+        // ---------- УПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНА (гладкое) ----------
         function getLocalCoords(e) {
             const rect = app.view.getBoundingClientRect();
             let clientX, clientY;
@@ -713,6 +735,7 @@
         window.addEventListener('touchmove', onPointerMove, { passive: false });
         window.addEventListener('touchend', onPointerEnd);
 
+        // Кнопки UI
         document.getElementById('restartBtn').onclick = () => location.reload();
         document.getElementById('upgradeDmg').onclick = () => applyUpgrade('dmg');
         document.getElementById('upgradeCrit').onclick = () => applyUpgrade('crit');
@@ -725,13 +748,13 @@
             };
         });
 
-        // Прицел
+        // Прицел (красивый)
         const aimGraphics = new PIXI.Graphics();
         app.stage.addChild(aimGraphics);
         function drawAim() {
             aimGraphics.clear();
             if (dragging && gameActive && !upgradePanelOpen) {
-                aimGraphics.lineStyle(2, 0xfff5c0, 0.8);
+                aimGraphics.lineStyle(2, 0xfff5c0, 0.9);
                 aimGraphics.moveTo(ARCHER_X, ARCHER_Y - 14);
                 aimGraphics.lineTo(dragX, dragY);
                 let dx = dragX - ARCHER_X;
@@ -758,12 +781,14 @@
         }
         drawAim();
 
+        // Старт
         currentDamage = baseDamage;
         currentCrit = baseCritChance;
         currentCooldown = baseCooldown;
         startWave(0);
         gameUpdate();
 
+        // Включение звука после первого касания
         view.addEventListener('touchstart', () => {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
