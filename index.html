@@ -24,55 +24,56 @@
         }
         .ui-panel {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
+            top: 10px;
+            left: 10px;
+            right: 10px;
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
             background: rgba(0,0,0,0.7);
             backdrop-filter: blur(8px);
-            padding: 8px 20px;
-            border-radius: 48px;
+            padding: 6px 12px;
+            border-radius: 40px;
             color: #f9eec1;
             pointer-events: none;
             z-index: 10;
-            font-size: 1rem;
+            font-size: 0.8rem;
             font-weight: bold;
         }
         .stat span {
             color: #ffcf7a;
-            font-size: 1.3rem;
-            margin-right: 6px;
+            font-size: 1.1rem;
+            margin-right: 4px;
         }
         .restart-btn {
             position: absolute;
-            top: 20px;
-            right: 20px;
+            top: 10px;
+            right: 10px;
             background: #b87a3c;
             border: none;
-            padding: 6px 16px;
-            border-radius: 40px;
+            padding: 4px 12px;
+            border-radius: 30px;
             color: white;
             font-weight: bold;
             cursor: pointer;
             pointer-events: auto;
             z-index: 20;
             font-family: monospace;
+            font-size: 0.7rem;
         }
         .arrow-selector {
             position: absolute;
-            bottom: 100px;
+            bottom: 80px;
             left: 0;
             right: 0;
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 10px;
             background: rgba(0,0,0,0.6);
             backdrop-filter: blur(8px);
-            padding: 8px;
-            border-radius: 60px;
+            padding: 6px;
+            border-radius: 50px;
             width: fit-content;
             margin: 0 auto;
             pointer-events: auto;
@@ -80,11 +81,11 @@
         }
         .arrow-btn {
             background: #2e241a;
-            border: 2px solid #cf9f4a;
+            border: 1px solid #cf9f4a;
             color: #ffecb3;
-            font-size: 0.9rem;
-            padding: 6px 16px;
-            border-radius: 40px;
+            font-size: 0.7rem;
+            padding: 4px 12px;
+            border-radius: 30px;
             cursor: pointer;
             font-weight: bold;
             transition: 0.1s;
@@ -96,16 +97,16 @@
         }
         .upgrade-panel {
             position: absolute;
-            bottom: 30px;
+            bottom: 20px;
             left: 0;
             right: 0;
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 12px;
             background: rgba(0,0,0,0.85);
             backdrop-filter: blur(12px);
-            padding: 12px 24px;
-            border-radius: 60px;
+            padding: 10px 16px;
+            border-radius: 50px;
             border: 1px solid #ffd966;
             transform: translateY(150%);
             transition: transform 0.3s;
@@ -118,19 +119,19 @@
         .upgrade-btn {
             background: #da943a;
             border: none;
-            font-size: 1rem;
+            font-size: 0.8rem;
             font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 40px;
+            padding: 6px 14px;
+            border-radius: 30px;
             color: #1e1507;
             cursor: pointer;
-            box-shadow: 0 4px 0 #754a1a;
+            box-shadow: 0 2px 0 #754a1a;
         }
         @media (max-width: 700px) {
-            .ui-panel { font-size: 0.7rem; padding: 5px 12px; top: 10px; }
+            .ui-panel { font-size: 0.7rem; padding: 4px 10px; }
             .stat span { font-size: 1rem; }
-            .arrow-btn { font-size: 0.7rem; padding: 4px 12px; }
-            .upgrade-btn { padding: 6px 14px; font-size: 0.8rem; }
+            .arrow-btn { font-size: 0.65rem; padding: 3px 10px; }
+            .upgrade-btn { font-size: 0.7rem; padding: 5px 12px; }
         }
     </style>
     <script src="libs/pixi.min.js"></script>
@@ -145,13 +146,13 @@
     </div>
     <button class="restart-btn" id="restartBtn">⚡ Новая игра</button>
     <div class="arrow-selector" id="arrowSelector">
-        <button class="arrow-btn" data-type="normal">🏹 Обычная</button>
+        <button class="arrow-btn active" data-type="normal">🏹 Обычная</button>
         <button class="arrow-btn" data-type="pierce">⚔️ Бронебойная</button>
         <button class="arrow-btn" data-type="fire">🔥 Зажигательная</button>
     </div>
     <div class="upgrade-panel" id="upgradePanel">
         <button class="upgrade-btn" id="upgradeDmg">💥 Урон +8</button>
-        <button class="upgrade-btn" id="upgradeCrit">🎯 Крит. шанс +10%</button>
+        <button class="upgrade-btn" id="upgradeCrit">🎯 Крит +10%</button>
         <button class="upgrade-btn" id="upgradeSpeed">⚡ Скорострельность</button>
     </div>
 </div>
@@ -170,8 +171,14 @@
         });
         container.appendChild(app.view);
 
-        const WORLD_W = 1100;
-        const WORLD_H = 600;
+        // Уменьшенный мир для лучшей видимости на телефонах
+        const WORLD_W = 900;
+        const WORLD_H = 500;
+        const GROUND_Y = 430;
+        const ARCHER_X = 110;
+        const ARCHER_Y = GROUND_Y - 18;
+        const GRAVITY = 0.28;
+
         function resizeStage() {
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -184,25 +191,16 @@
         window.addEventListener('resize', resizeStage);
         resizeStage();
 
-        // ---------- Игровые константы ----------
-        const GROUND_Y = 520;
-        const ARCHER_X = 130;
-        const ARCHER_Y = GROUND_Y - 18;
-        const GRAVITY = 0.28;
-
-        // Параметры лучника (базовые)
+        // ---------- Игровые параметры ----------
         let baseDamage = 28;
         let extraDamage = 0;
         let baseCritChance = 0.15;
         let extraCrit = 0;
-        let baseCooldown = 28;       // кадры
+        let baseCooldown = 28;
         let cooldownReduction = 0;
         let currentDamage, currentCrit, currentCooldown;
 
-        // Тип стрелы
-        let currentArrowType = 'normal'; // normal, pierce, fire
-
-        // Ресурсы
+        let currentArrowType = 'normal';
         let baseHealth = 100;
         let score = 0;
         let wave = 0;
@@ -213,12 +211,9 @@
         let shootTimer = 0;
         let upgradePanelOpen = false;
 
-        // Динамические списки
         let enemies = [];
         let arrows = [];
-        let particles = [];
 
-        // Управление прицелом
         let dragging = false;
         let dragX = ARCHER_X, dragY = ARCHER_Y - 12;
 
@@ -240,12 +235,12 @@
             g.endFill();
             return app.renderer.generateTexture(g);
         }
-        const texFootman = makeCircleTex(0xbc9a6c, 18);
-        const texHeavy = makeCircleTex(0x8a6a4a, 22);
-        const texSwift = makeCircleTex(0xdbba7a, 16);
-        const texBrute = makeCircleTex(0xac5c3a, 28);
-        const texArrow = makeCircleTex(0xffdd88, 6);
-        const texFireArrow = makeCircleTex(0xff6633, 7);
+        const texFootman = makeCircleTex(0xbc9a6c, 16);
+        const texHeavy = makeCircleTex(0x8a6a4a, 20);
+        const texSwift = makeCircleTex(0xdbba7a, 14);
+        const texBrute = makeCircleTex(0xac5c3a, 24);
+        const texArrow = makeCircleTex(0xffdd88, 5);
+        const texFireArrow = makeCircleTex(0xff6633, 6);
 
         // Фон
         function drawBackground() {
@@ -254,24 +249,24 @@
             g.drawRect(0, 0, WORLD_W, GROUND_Y-40);
             g.beginFill(0x6b4e2a);
             g.drawRect(0, GROUND_Y, WORLD_W, WORLD_H - GROUND_Y + 8);
-            for(let i=0;i<25;i++) g.drawRect(i*55, GROUND_Y-4, 32, 8);
+            for(let i=0;i<20;i++) g.drawRect(i*50, GROUND_Y-4, 28, 8);
             // замок
             g.beginFill(0xcfaa77);
-            g.drawRect(35, GROUND_Y-56, 55, 62);
+            g.drawRect(30, GROUND_Y-48, 48, 54);
             g.beginFill(0xfad48b);
-            g.drawRect(48, GROUND_Y-80, 30, 34);
+            g.drawRect(40, GROUND_Y-70, 28, 28);
             g.beginFill(0xffde9e);
-            g.drawPolygon([30,GROUND_Y-56, 62,GROUND_Y-92, 95,GROUND_Y-56]);
-            // лучник (фигурка)
+            g.drawPolygon([26,GROUND_Y-48, 54,GROUND_Y-80, 82,GROUND_Y-48]);
+            // лучник
             g.beginFill(0xe3aa66);
-            g.drawCircle(ARCHER_X, ARCHER_Y-8, 14);
+            g.drawCircle(ARCHER_X, ARCHER_Y-8, 12);
             g.beginFill(0xdaa06a);
-            g.drawRect(ARCHER_X-8, ARCHER_Y-4, 16, 20);
+            g.drawRect(ARCHER_X-7, ARCHER_Y-4, 14, 18);
             bgLayer.addChild(g);
         }
         drawBackground();
 
-        // Враги с зонами
+        // Класс врага (с зонами)
         class Enemy extends PIXI.Sprite {
             constructor(type, hp, speed, reward, radius, hasShield, hasHelmet) {
                 let tex = texFootman;
@@ -288,32 +283,31 @@
                 this.hasShield = hasShield;
                 this.hasHelmet = hasHelmet;
                 this.waypointIdx = 1;
-                this.pos = { x: WORLD_W - 55, y: GROUND_Y - 12 };
-                this.target = { x: WORLD_W - 200, y: GROUND_Y - 18 };
+                this.pos = { x: WORLD_W - 45, y: GROUND_Y - 12 };
+                this.target = { x: WORLD_W - 170, y: GROUND_Y - 16 };
                 this.alive = true;
                 this.x = this.pos.x;
                 this.y = this.pos.y;
                 this.anchor.set(0.5);
-                // текст HP
-                this.hpText = new PIXI.Text(`${this.hp}`, { fontSize: 12, fill: 0xffefcf, stroke: '#000', strokeThickness: 2 });
+                this.hpText = new PIXI.Text(`${this.hp}`, { fontSize: 11, fill: 0xffefcf, stroke: '#000', strokeThickness: 2 });
                 this.hpText.anchor.set(0.5);
                 this.addChild(this.hpText);
             }
             update() {
                 if (!this.alive) return;
+                const waypoints = [
+                    { x: WORLD_W - 45, y: GROUND_Y - 12 },
+                    { x: WORLD_W - 170, y: GROUND_Y - 16 },
+                    { x: WORLD_W - 290, y: GROUND_Y - 8 },
+                    { x: WORLD_W - 410, y: GROUND_Y - 14 },
+                    { x: ARCHER_X + 40, y: GROUND_Y - 14 },
+                    { x: 50, y: GROUND_Y - 10 }
+                ];
                 const dx = this.target.x - this.pos.x;
                 const dy = this.target.y - this.pos.y;
                 const dist = Math.hypot(dx, dy);
                 if (dist < 3) {
                     this.waypointIdx++;
-                    const waypoints = [
-                        { x: WORLD_W - 55, y: GROUND_Y - 12 },
-                        { x: WORLD_W - 200, y: GROUND_Y - 18 },
-                        { x: WORLD_W - 340, y: GROUND_Y - 6 },
-                        { x: WORLD_W - 480, y: GROUND_Y - 14 },
-                        { x: ARCHER_X + 45, y: GROUND_Y - 16 },
-                        { x: 60, y: GROUND_Y - 10 }
-                    ];
                     if (this.waypointIdx >= waypoints.length) {
                         const dmg = Math.floor(this.hp / 2 + 8);
                         baseHealth = Math.max(0, baseHealth - dmg);
@@ -335,43 +329,35 @@
                 }
                 this.hpText.text = `${Math.ceil(this.hp)}`;
                 this.hpText.x = 0;
-                this.hpText.y = -this.radius - 6;
+                this.hpText.y = -this.radius - 5;
             }
             getHitZone(arrowX, arrowY) {
-                // локальные координаты (центр врага в 0,0)
                 const dx = arrowX - this.x;
                 const dy = arrowY - this.y;
                 const normY = dy / this.radius;
-                // зоны по вертикали
                 if (normY < -0.5) return 'head';
                 if (normY > 0.4) return 'legs';
-                // проверка щита (левый борт, т.к. враги идут слева направо)
                 if (this.hasShield && dx < 0) return 'shield';
                 return 'body';
             }
             takeDamage(amount, zone, arrowType) {
                 let multiplier = 1.0;
                 let isCrit = false;
-                // множители зон
                 if (zone === 'head') {
                     multiplier = this.hasHelmet ? 1.0 : 2.2;
                     if (!this.hasHelmet && Math.random() < currentCrit) isCrit = true;
                 } else if (zone === 'shield') {
-                    multiplier = 0.2; // почти полный блок
+                    multiplier = 0.2;
                 } else if (zone === 'legs') {
                     multiplier = 0.7;
-                } else { // body
-                    multiplier = 1.0;
                 }
-                // бонус от типа стрелы
                 let bonus = 1.0;
-                if (arrowType === 'pierce' && zone === 'shield') bonus = 1.5; // бронебойная пробивает щит
+                if (arrowType === 'pierce' && zone === 'shield') bonus = 1.5;
                 if (arrowType === 'fire') bonus = 1.2;
                 let finalDamage = amount * multiplier * bonus;
                 if (isCrit) finalDamage *= 2.5;
                 this.hp -= finalDamage;
-                // визуал урона
-                showDamageNumber(this.x, this.y-this.radius-10, Math.floor(finalDamage), isCrit);
+                showDamageNumber(this.x, this.y-this.radius-8, Math.floor(finalDamage), isCrit);
                 if (this.hp <= 0) {
                     this.alive = false;
                     score += this.reward;
@@ -398,26 +384,22 @@
                 this.vx = vx;
                 this.vy = vy;
                 this.active = true;
-                this.hit = false;
             }
             update() {
                 if (!this.active) return;
                 this.sprite.x += this.vx;
                 this.sprite.y += this.vy;
                 this.vy += GRAVITY;
-                // проверка границ земли
                 if (this.sprite.y + 6 >= GROUND_Y || this.sprite.x < 0 || this.sprite.x > WORLD_W) {
                     this.destroy();
                     return;
                 }
-                // проверка попадания во врагов
                 for (let i = 0; i < enemies.length; i++) {
                     const e = enemies[i];
                     if (!e.alive) continue;
                     const dx = this.sprite.x - e.x;
                     const dy = this.sprite.y - e.y;
-                    const dist = Math.hypot(dx, dy);
-                    if (dist < e.radius + 6) {
+                    if (Math.hypot(dx, dy) < e.radius + 5) {
                         const zone = e.getHitZone(this.sprite.x, this.sprite.y);
                         let damage = currentDamage;
                         if (this.type === 'pierce') damage = currentDamage + 10;
@@ -431,14 +413,12 @@
             destroy() {
                 this.active = false;
                 arrowLayer.removeChild(this.sprite);
-                // добавить эффект
                 createHitEffect(this.sprite.x, this.sprite.y);
             }
         }
 
-        // Вспомогательные функции
         function showDamageNumber(x, y, dmg, crit) {
-            const text = new PIXI.Text(`${dmg}${crit ? ' CRIT!' : ''}`, { fontSize: 14, fill: crit ? 0xff6666 : 0xffdd99, stroke: '#000', strokeThickness: 2 });
+            const text = new PIXI.Text(`${dmg}${crit ? ' CRIT!' : ''}`, { fontSize: 12, fill: crit ? 0xff8888 : 0xffdd99, stroke: '#000', strokeThickness: 1 });
             text.x = x;
             text.y = y;
             effectLayer.addChild(text);
@@ -446,7 +426,7 @@
             const interval = setInterval(() => {
                 life -= 0.02;
                 text.alpha = life;
-                text.y -= 1;
+                text.y -= 0.8;
                 if (life <= 0) {
                     clearInterval(interval);
                     effectLayer.removeChild(text);
@@ -457,7 +437,7 @@
         function createHitEffect(x, y) {
             const g = new PIXI.Graphics();
             g.beginFill(0xffaa66);
-            g.drawCircle(0,0,8);
+            g.drawCircle(0,0,6);
             g.endFill();
             g.x = x; g.y = y;
             effectLayer.addChild(g);
@@ -472,7 +452,6 @@
             }, 30);
         }
 
-        // Звуки (синтез)
         let audioCtx = null;
         function playSound(type) {
             if (!audioCtx) return;
@@ -482,29 +461,29 @@
                 const osc = ctx.createOscillator();
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                gain.gain.value = 0.1;
+                gain.gain.value = 0.08;
                 if (type === 'shoot') {
                     osc.frequency.value = 440;
-                    gain.gain.exponentialRampToValue(0.0001, 0.15);
-                    osc.start(); osc.stop(0.15);
+                    gain.gain.exponentialRampToValue(0.0001, 0.12);
+                    osc.start(); osc.stop(0.12);
                 } else if (type === 'hit') {
                     osc.frequency.value = 220;
-                    gain.gain.exponentialRampToValue(0.0001, 0.2);
-                    osc.start(); osc.stop(0.2);
+                    gain.gain.exponentialRampToValue(0.0001, 0.18);
+                    osc.start(); osc.stop(0.18);
                 } else if (type === 'death') {
                     osc.frequency.value = 120;
-                    gain.gain.exponentialRampToValue(0.0001, 0.3);
-                    osc.start(); osc.stop(0.3);
+                    gain.gain.exponentialRampToValue(0.0001, 0.25);
+                    osc.start(); osc.stop(0.25);
                 }
             } catch(e) {}
         }
 
-        // ----- Генерация волн (с разными shield/helmet) -----
+        // Генерация волн
         function generateWave(waveIdx) {
-            const count = 4 + Math.floor(waveIdx * 0.6) + Math.floor(Math.random() * 2);
+            const count = 3 + Math.floor(waveIdx * 0.6) + Math.floor(Math.random() * 2);
             const types = ['footman', 'heavy', 'swift'];
             if (waveIdx >= 3) types.push('brute');
-            let enemiesList = [];
+            let list = [];
             for (let i = 0; i < count; i++) {
                 let type = types[Math.floor(Math.random() * types.length)];
                 let hasShield = false, hasHelmet = false;
@@ -517,9 +496,9 @@
                 } else if (type === 'footman') {
                     hasShield = Math.random() < 0.3;
                 }
-                enemiesList.push({ type, hasShield, hasHelmet });
+                list.push({ type, hasShield, hasHelmet });
             }
-            return enemiesList;
+            return list;
         }
 
         function buildSpawnQueue(waveIdx) {
@@ -528,10 +507,10 @@
             const scale = 1 + waveIdx * 0.12;
             for (let i = 0; i < comp.length; i++) {
                 let c = comp[i];
-                let baseHp = 44, baseSpeed = 1.1, reward = 28, radius = 18;
-                if (c.type === 'heavy') { baseHp = 95; baseSpeed = 0.72; reward = 50; radius = 22; }
-                else if (c.type === 'swift') { baseHp = 30; baseSpeed = 1.85; reward = 24; radius = 16; }
-                else if (c.type === 'brute') { baseHp = 160; baseSpeed = 0.62; reward = 90; radius = 28; }
+                let baseHp = 44, baseSpeed = 1.1, reward = 28, radius = 16;
+                if (c.type === 'heavy') { baseHp = 95; baseSpeed = 0.72; reward = 50; radius = 20; }
+                else if (c.type === 'swift') { baseHp = 30; baseSpeed = 1.85; reward = 24; radius = 14; }
+                else if (c.type === 'brute') { baseHp = 160; baseSpeed = 0.62; reward = 90; radius = 24; }
                 const hp = Math.floor(baseHp * scale);
                 const speed = baseSpeed * (1 - Math.min(0.25, waveIdx * 0.008));
                 const rwd = Math.floor(reward * (1 + waveIdx * 0.05));
@@ -543,10 +522,9 @@
                     radius: radius,
                     hasShield: c.hasShield,
                     hasHelmet: c.hasHelmet,
-                    delay: 20 + i * 14
+                    delay: 18 + i * 12
                 });
             }
-            // shuffle
             for (let i = queue.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [queue[i], queue[j]] = [queue[j], queue[i]];
@@ -559,11 +537,11 @@
 
         function startWave(waveIdx) {
             enemiesToSpawn = buildSpawnQueue(waveIdx);
-            spawnDelay = 10;
+            spawnDelay = 8;
             waveActive = true;
             waveTransition = 0;
             document.getElementById('waveNum').innerText = waveIdx;
-            playSound('shoot'); // просто звук начала
+            playSound('shoot');
         }
 
         function updateWave() {
@@ -608,17 +586,16 @@
             startWave(wave);
         }
 
-        // Выстрел
         function shoot(targetX, targetY) {
             if (!gameActive || !canShoot) return false;
             let dx = targetX - ARCHER_X;
             let dy = targetY - (ARCHER_Y - 12);
-            let dist = Math.min(320, Math.hypot(dx, dy));
-            if (dist < 20) return false;
+            let dist = Math.min(280, Math.hypot(dx, dy));
+            if (dist < 18) return false;
             let angle = Math.atan2(dy, dx);
             let power = dist * 0.68;
-            let vx = Math.cos(angle) * Math.min(power, 14.5);
-            let vy = Math.sin(angle) * Math.min(power, 14.5);
+            let vx = Math.cos(angle) * Math.min(power, 13.5);
+            let vy = Math.sin(angle) * Math.min(power, 13.5);
             const arrow = new Arrow(ARCHER_X, ARCHER_Y - 12, vx, vy, currentArrowType);
             arrows.push(arrow);
             canShoot = false;
@@ -637,7 +614,6 @@
             }
         }
 
-        // Цикл игры
         function gameUpdate() {
             if (!gameActive && !upgradePanelOpen) return;
             updateWave();
@@ -649,7 +625,6 @@
                 }
             }
             updateArrows();
-
             if (!upgradePanelOpen && gameActive) {
                 if (!canShoot) {
                     shootTimer--;
@@ -665,13 +640,12 @@
         }
 
         function updateUI() {
-            document.getElementById('baseHp').innerText = baseHealth;
+            document.getElementById('baseHp').innerText = Math.floor(baseHealth);
             document.getElementById('score').innerText = Math.floor(score);
             document.getElementById('waveNum').innerText = wave;
             document.getElementById('enemiesCount').innerText = enemies.length;
         }
 
-        // Апгрейды
         function applyUpgrade(upgrade) {
             if (upgrade === 'dmg') extraDamage += 8;
             else if (upgrade === 'crit') extraCrit = Math.min(extraCrit + 0.1, 0.6);
@@ -684,7 +658,7 @@
             hideUpgradePanel();
         }
 
-        // Управление мышью/тач
+        // Управление
         function getLocalCoords(e) {
             const rect = app.view.getBoundingClientRect();
             let clientX, clientY;
@@ -732,12 +706,10 @@
         window.addEventListener('touchmove', onPointerMove, { passive: false });
         window.addEventListener('touchend', onPointerEnd);
 
-        // Кнопки UI
         document.getElementById('restartBtn').onclick = () => location.reload();
         document.getElementById('upgradeDmg').onclick = () => applyUpgrade('dmg');
         document.getElementById('upgradeCrit').onclick = () => applyUpgrade('crit');
         document.getElementById('upgradeSpeed').onclick = () => applyUpgrade('speed');
-        // Выбор стрел
         document.querySelectorAll('.arrow-btn').forEach(btn => {
             btn.onclick = () => {
                 document.querySelectorAll('.arrow-btn').forEach(b => b.classList.remove('active'));
@@ -745,7 +717,6 @@
                 currentArrowType = btn.dataset.type;
             };
         });
-        document.querySelector('.arrow-btn').classList.add('active');
 
         // Прицел
         const aimGraphics = new PIXI.Graphics();
@@ -753,21 +724,21 @@
         function drawAim() {
             aimGraphics.clear();
             if (dragging && gameActive && !upgradePanelOpen) {
-                aimGraphics.lineStyle(3, 0xfff5c0, 0.8);
+                aimGraphics.lineStyle(2, 0xfff5c0, 0.8);
                 aimGraphics.moveTo(ARCHER_X, ARCHER_Y - 14);
                 aimGraphics.lineTo(dragX, dragY);
                 let dx = dragX - ARCHER_X;
                 let dy = dragY - (ARCHER_Y - 14);
-                let dist = Math.min(320, Math.hypot(dx, dy));
-                if (dist > 20) {
+                let dist = Math.min(280, Math.hypot(dx, dy));
+                if (dist > 18) {
                     let angle = Math.atan2(dy, dx);
                     let spd = dist * 0.68;
-                    let vx = Math.cos(angle) * Math.min(spd, 14.5);
-                    let vy = Math.sin(angle) * Math.min(spd, 14.5);
+                    let vx = Math.cos(angle) * Math.min(spd, 13.5);
+                    let vy = Math.sin(angle) * Math.min(spd, 13.5);
                     let px = ARCHER_X, py = ARCHER_Y - 14;
                     let vxt = vx, vyt = vy;
                     aimGraphics.moveTo(px, py);
-                    for (let i = 0; i < 30; i++) {
+                    for (let i = 0; i < 25; i++) {
                         px += vxt;
                         py += vyt;
                         vyt += GRAVITY;
@@ -780,14 +751,12 @@
         }
         drawAim();
 
-        // Инициализация
         currentDamage = baseDamage;
         currentCrit = baseCritChance;
         currentCooldown = baseCooldown;
         startWave(0);
         gameUpdate();
 
-        // Активация звука
         view.addEventListener('touchstart', () => {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
