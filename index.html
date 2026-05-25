@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение: Бой с боссом</title>
+    <title>2.5D Приключение: Новое управление</title>
     <style>
         * {
             margin: 0;
@@ -29,22 +29,53 @@
             cursor: crosshair;
             touch-action: none;
         }
-        /* Джойстик движения */
+        /* Зоны управления (визуально не мешают, но для понимания) */
+        .control-zones {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .zone-left {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            background: rgba(100, 200, 150, 0.1);
+            border-top-right-radius: 30px;
+            pointer-events: none;
+        }
+        .zone-right {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            background: rgba(200, 100, 100, 0.1);
+            border-top-left-radius: 30px;
+            pointer-events: none;
+        }
+        /* Джойстик (отображается только в левой зоне) */
         .joystick-container {
             position: fixed;
             bottom: 40px;
             left: 30px;
             width: 140px;
             height: 140px;
-            background: rgba(30, 45, 40, 0.65);
+            background: rgba(30, 45, 40, 0.75);
             backdrop-filter: blur(12px);
             border-radius: 50%;
-            box-shadow: 0 0 0 2px rgba(200, 180, 100, 0.5);
+            box-shadow: 0 0 0 2px rgba(200, 180, 100, 0.6);
             touch-action: none;
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 100;
+            pointer-events: auto;
         }
         .joystick-base {
             width: 110px;
@@ -66,37 +97,18 @@
             touch-action: none;
             cursor: grab;
         }
-        /* Кнопка Fire (стрельба/прицел) */
-        .fire-button {
+        /* Прицельная точка (визуально в правой зоне) */
+        .aim-dot {
             position: fixed;
-            bottom: 40px;
-            right: 30px;
-            width: 80px;
-            height: 80px;
-            background: rgba(180, 60, 40, 0.85);
-            backdrop-filter: blur(10px);
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 200, 100, 0.8);
             border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2rem;
-            font-weight: bold;
-            color: white;
-            text-shadow: 0 2px 4px black;
-            box-shadow: 0 0 0 3px #ffcc88, 0 6px 15px black;
-            cursor: pointer;
-            touch-action: none;
-            z-index: 100;
-            transition: 0.05s linear;
-        }
-        .fire-button:active {
-            transform: scale(0.96);
-        }
-        @media (max-width: 768px) {
-            .joystick-container { width: 120px; height: 120px; bottom: 25px; left: 20px; }
-            .joystick-base { width: 95px; height: 95px; }
-            .joystick-thumb { width: 47px; height: 47px; top: 24px; left: 24px; }
-            .fire-button { width: 70px; height: 70px; bottom: 25px; right: 20px; font-size: 1.8rem; }
+            border: 2px solid white;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 200;
+            display: none;
         }
         /* Интерфейс */
         .ui {
@@ -114,7 +126,6 @@
             z-index: 100;
             display: flex;
             gap: 20px;
-            flex-wrap: wrap;
         }
         .weapon-info {
             position: fixed;
@@ -169,29 +180,42 @@
             transition: width 0.2s;
         }
         @media (max-width: 768px) {
-            .boss-health { width: 200px; top: 70px; }
+            .joystick-container { width: 120px; height: 120px; bottom: 25px; left: 20px; }
+            .joystick-base { width: 95px; height: 95px; }
+            .joystick-thumb { width: 47px; height: 47px; top: 24px; left: 24px; }
             .reload-indicator { bottom: 115px; right: 25px; width: 50px; }
+            .boss-health { width: 200px; top: 70px; }
         }
-        /* Направляющая линия прицела (только при активном прицеливании) */
-        .aim-line-canvas {
+        .instruction {
             position: fixed;
-            top: 0;
+            bottom: 10px;
             left: 0;
+            right: 0;
+            text-align: center;
+            color: #aaa;
+            font-size: 10px;
             pointer-events: none;
-            z-index: 200;
+            z-index: 100;
+            background: rgba(0,0,0,0.4);
+            padding: 4px;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div class="control-zones">
+        <div class="zone-left"></div>
+        <div class="zone-right"></div>
+    </div>
     <div class="joystick-container" id="joystickContainer">
         <div class="joystick-base"><div class="joystick-thumb" id="joystickThumb"></div></div>
     </div>
-    <div class="fire-button" id="fireButton">⚔️</div>
+    <div class="aim-dot" id="aimDot"></div>
     <div class="ui">❤️ <span id="hpValue">100</span> &nbsp;| 🧟‍♂️ <span id="kills">0</span></div>
     <div class="weapon-info" id="weaponInfo">🗡️ Меч (урон 28)</div>
     <div class="reload-indicator"><div class="reload-fill" id="reloadFill"></div></div>
     <div class="boss-health" id="bossHealthBar"><div class="boss-fill" id="bossFill"></div></div>
+    <div class="instruction">👉 Левая зона - движение | Правая зона - прицел и удар (зажми, веди, отпусти)</div>
 
     <script>
         (function(){
@@ -249,7 +273,7 @@
             // ---------- ВРАГИ ----------
             let enemies = [];
             class Enemy {
-                constructor(x,y, type="normal") {
+                constructor(x,y) {
                     this.x=x; this.y=y; this.w=34; this.h=34;
                     this.hp=45; this.maxHp=45;
                     this.speed=1.4;
@@ -396,27 +420,7 @@
             let decorations=[];
             for(let i=0;i<180;i++) decorations.push({ x:Math.random()*WORLD_WIDTH, y:Math.random()*WORLD_HEIGHT, type:0 });
             
-            // ---------- УПРАВЛЕНИЕ ----------
-            const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false };
-            window.addEventListener('keydown', (e)=>{
-                let k=e.key;
-                if(keys.hasOwnProperty(k)) { keys[k]=true; e.preventDefault(); }
-                if(k==='w'||k==='W') keys.w=true;
-                if(k==='s'||k==='S') keys.s=true;
-                if(k==='a'||k==='A') keys.a=true;
-                if(k==='d'||k==='D') keys.d=true;
-                if(k===' '||k==='Space') { e.preventDefault(); performAttackMouse(); }
-            });
-            window.addEventListener('keyup', (e)=>{
-                let k=e.key;
-                if(keys.hasOwnProperty(k)) keys[k]=false;
-                if(k==='w'||k==='W') keys.w=false;
-                if(k==='s'||k==='S') keys.s=false;
-                if(k==='a'||k==='A') keys.a=false;
-                if(k==='d'||k==='D') keys.d=false;
-            });
-            
-            // Джойстик движения
+            // ---------- УПРАВЛЕНИЕ: ЛЕВАЯ ЗОНА (движение) ----------
             let moveVec={x:0,y:0}, moveActive=false;
             const moveBase=document.querySelector('#joystickContainer .joystick-base');
             const moveThumb=document.getElementById('joystickThumb');
@@ -441,84 +445,88 @@
             function onMoveMove(e){ if(moveActive) updateMove(e); }
             function onMoveUp(){ endMove(); window.removeEventListener('mousemove',onMoveMove); window.removeEventListener('mouseup',onMoveUp); }
             
-            // ---------- СТРЕЛЬБА/ПРИЦЕЛ (одна кнопка) ----------
+            // ---------- УПРАВЛЕНИЕ: ПРАВАЯ ЗОНА (прицел и удар) ----------
             let aiming = false;
             let aimDirection = { x:1, y:0 };
             let aimStartX = 0, aimStartY = 0;
-            const fireBtn = document.getElementById('fireButton');
+            const aimDot = document.getElementById('aimDot');
             
-            // На ПК: клик — выстрел по курсору
-            function performAttackMouse() {
-                if(currentWeapon.attackCooldown>0) return;
-                let dir = getMouseDirection();
-                executeAttack(dir);
-            }
-            function getMouseDirection() {
-                let playerScreenX = player.x - camera.x + PLAYER_W/2;
-                let playerScreenY = player.y - camera.y + PLAYER_H/2;
-                let dx = mouseX - playerScreenX;
-                let dy = mouseY - playerScreenY;
-                let len = Math.hypot(dx,dy);
-                if(len<0.01) return {x:1,y:0};
-                return {x:dx/len, y:dy/len};
+            // Проверка, находится ли точка в правой нижней четверти экрана
+            function isInRightZone(x, y) {
+                return x > CANVAS_W/2 && y > CANVAS_H/2;
             }
             
-            // Мобильное устройство: при нажатии на кнопку начинаем прицеливание (палец можно двигать)
-            fireBtn.addEventListener('touchstart', (e) => {
+            function handleAimStart(e) {
                 e.preventDefault();
-                if(currentWeapon.attackCooldown>0) return;
+                let clientX, clientY;
+                if(e.touches) { clientX=e.touches[0].clientX; clientY=e.touches[0].clientY; }
+                else { clientX=e.clientX; clientY=e.clientY; }
+                if(!isInRightZone(clientX, clientY)) return;
                 aiming = true;
-                const touch = e.touches[0];
-                aimStartX = touch.clientX;
-                aimStartY = touch.clientY;
-                // начальное направление (вперёд)
+                aimStartX = clientX;
+                aimStartY = clientY;
                 aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
-                // Добавляем визуальную линию
-            });
+                aimDot.style.display = 'block';
+                aimDot.style.left = clientX + 'px';
+                aimDot.style.top = clientY + 'px';
+            }
             
-            fireBtn.addEventListener('touchmove', (e) => {
+            function handleAimMove(e) {
                 if(!aiming) return;
                 e.preventDefault();
-                const touch = e.touches[0];
-                let dx = touch.clientX - aimStartX;
-                let dy = touch.clientY - aimStartY;
-                let len = Math.hypot(dx,dy);
-                if(len > 5) {
+                let clientX, clientY;
+                if(e.touches) { clientX=e.touches[0].clientX; clientY=e.touches[0].clientY; }
+                else { clientX=e.clientX; clientY=e.clientY; }
+                if(!isInRightZone(clientX, clientY)) return;
+                let dx = clientX - aimStartX;
+                let dy = clientY - aimStartY;
+                let len = Math.hypot(dx, dy);
+                if(len > 10) {
                     aimDirection.x = dx / len;
                     aimDirection.y = dy / len;
                 } else {
                     aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
                 }
-            });
+                aimDot.style.left = clientX + 'px';
+                aimDot.style.top = clientY + 'px';
+            }
             
-            fireBtn.addEventListener('touchend', (e) => {
+            function handleAimEnd(e) {
                 if(!aiming) return;
                 e.preventDefault();
                 aiming = false;
-                executeAttack(aimDirection);
-            });
-            
-            // Для мыши на телефоне (отладка) — клик
-            fireBtn.addEventListener('mousedown', (e) => {
-                if(window.innerWidth > 768) return; // на ПК отдельно
-                e.preventDefault();
-                if(currentWeapon.attackCooldown>0) return;
-                aiming = true;
-                const rect = fireBtn.getBoundingClientRect();
-                aimStartX = rect.left + rect.width/2;
-                aimStartY = rect.top + rect.height/2;
-                aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
-            });
-            fireBtn.addEventListener('mouseup', (e) => {
-                if(window.innerWidth > 768) return;
-                e.preventDefault();
-                if(aiming) {
-                    aiming = false;
+                aimDot.style.display = 'none';
+                // Выполняем атаку
+                if(currentWeapon.attackCooldown <= 0) {
                     executeAttack(aimDirection);
+                }
+            }
+            
+            // Подключаем события для правой зоны (весь canvas, но фильтр по координатам)
+            canvas.addEventListener('touchstart', handleAimStart);
+            canvas.addEventListener('touchmove', handleAimMove);
+            canvas.addEventListener('touchend', handleAimEnd);
+            canvas.addEventListener('mousedown', handleAimStart);
+            canvas.addEventListener('mousemove', (e) => { if(aiming) handleAimMove(e); });
+            canvas.addEventListener('mouseup', handleAimEnd);
+            
+            // Для ПК также клик правой кнопкой или просто клик в правой зоне
+            canvas.addEventListener('click', (e) => {
+                if(window.innerWidth > 768 && isInRightZone(e.clientX, e.clientY) && currentWeapon.attackCooldown <= 0) {
+                    // используем направление от игрока к курсору
+                    let rect = canvas.getBoundingClientRect();
+                    let mouseCanvasX = (e.clientX - rect.left) * CANVAS_W / rect.width;
+                    let mouseCanvasY = (e.clientY - rect.top) * CANVAS_H / rect.height;
+                    let playerScreenX = player.x - camera.x + PLAYER_W/2;
+                    let playerScreenY = player.y - camera.y + PLAYER_H/2;
+                    let dx = mouseCanvasX - playerScreenX;
+                    let dy = mouseCanvasY - playerScreenY;
+                    let len = Math.hypot(dx,dy);
+                    if(len>0.01) { dx/=len; dy/=len; } else { dx=1; dy=0; }
+                    executeAttack({x:dx, y:dy});
                 }
             });
             
-            // Общая функция атаки
             function executeAttack(dir) {
                 if(currentWeapon.attackCooldown>0) return;
                 if(currentWeapon.type === WeaponType.MELEE) {
@@ -556,10 +564,7 @@
                 currentWeapon.attackCooldown=currentWeapon.attackDelay;
             }
             
-            // Мышь для прицела на ПК
-            let mouseX=CANVAS_W/2+100, mouseY=CANVAS_H/2;
-            canvas.addEventListener('mousemove',(e)=>{ const rect=canvas.getBoundingClientRect(); mouseX=(e.clientX-rect.left)*CANVAS_W/rect.width; mouseY=(e.clientY-rect.top)*CANVAS_H/rect.height; });
-            
+            // ---------- ОБНОВЛЕНИЯ ----------
             function updateProjectiles() {
                 for(let i=0;i<projectiles.length;i++) {
                     let p=projectiles[i];
@@ -628,11 +633,31 @@
                 let newY=player.y+moveY*MOVE_SPEED;
                 if(!collision(player.x, newY, PLAYER_W, PLAYER_H)) player.y=newY;
             }
+            
             function collision(x,y,w,h){
                 if(x<0||y<0||x+w>WORLD_WIDTH||y+h>WORLD_HEIGHT) return true;
                 for(let wa of walls) if(x<wa.x+wa.w && x+w>wa.x && y<wa.y+wa.h && y+h>wa.y) return true;
                 return false;
             }
+            
+            // Клавиатура для движения (дополнительно)
+            const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false };
+            window.addEventListener('keydown', (e)=>{
+                let k=e.key;
+                if(keys.hasOwnProperty(k)) { keys[k]=true; e.preventDefault(); }
+                if(k==='w'||k==='W') keys.w=true;
+                if(k==='s'||k==='S') keys.s=true;
+                if(k==='a'||k==='A') keys.a=true;
+                if(k==='d'||k==='D') keys.d=true;
+            });
+            window.addEventListener('keyup', (e)=>{
+                let k=e.key;
+                if(keys.hasOwnProperty(k)) keys[k]=false;
+                if(k==='w'||k==='W') keys.w=false;
+                if(k==='s'||k==='S') keys.s=false;
+                if(k==='a'||k==='A') keys.a=false;
+                if(k==='d'||k==='D') keys.d=false;
+            });
             
             let camera={x:0,y:0};
             function updateCamera(){
@@ -641,13 +666,14 @@
                 camera.y=Math.min(Math.max(0,ty), WORLD_HEIGHT-CANVAS_H);
             }
             
-            // Спавн босса после 5 убийств
             function checkBossSpawn() {
-                if(!boss && player.kills>=5) spawnBoss();
+                if(!boss && player.kills >= 5) {
+                    spawnBoss();
+                }
                 if(boss) boss.update();
             }
             
-            // Отрисовка
+            // ---------- ОТРИСОВКА ----------
             function drawGround() {
                 let grad=ctx.createLinearGradient(0,CANVAS_H,0,0);
                 grad.addColorStop(0,'#5d9652'); grad.addColorStop(1,'#2b522c');
@@ -702,12 +728,9 @@
             }
             function drawProjectiles(){ for(let p of projectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size/1.5,0,Math.PI*2); ctx.fill(); } }
             function drawAimLine(){
-                let dir;
-                if(aiming) dir = aimDirection;
-                else if(window.innerWidth > 768) dir = getMouseDirection();
-                else return;
+                if(!aiming) return;
                 let startX=player.x-camera.x+PLAYER_W/2, startY=player.y-camera.y+PLAYER_H/2;
-                let endX=startX+dir.x*60, endY=startY+dir.y*60;
+                let endX=startX+aimDirection.x*60, endY=startY+aimDirection.y*60;
                 ctx.beginPath(); ctx.moveTo(startX,startY); ctx.lineTo(endX,endY);
                 ctx.strokeStyle='#ffcc88'; ctx.lineWidth=3; ctx.stroke();
                 ctx.beginPath(); ctx.arc(endX,endY,8,0,Math.PI*2); ctx.fillStyle='#ffaa55aa'; ctx.fill();
@@ -737,6 +760,7 @@
                 drawAimLine();
                 ctx.fillStyle='#c0e0a020'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
             }
+            
             function gameLoop(t){ render(t); requestAnimationFrame(gameLoop); }
             scatterWeapons();
             for(let i=0;i<3;i++) enemies.push(new Enemy(700+i*150, 800));
