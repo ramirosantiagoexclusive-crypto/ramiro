@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Mobile Ready</title>
+    <title>2.5D Adventure - NippleJS Controls</title>
     <style>
         * {
             margin: 0;
@@ -16,6 +16,7 @@
             background: #0a2a22;
             overflow: hidden;
             touch-action: none;
+            font-family: system-ui, 'Segoe UI', monospace;
         }
         canvas {
             display: block;
@@ -25,71 +26,24 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            pointer-events: none;
+            pointer-events: none; /* события захватывают div-зоны */
         }
-        .move-zone {
+        /* Зоны для джойстиков */
+        .joystick-area {
             position: fixed;
             bottom: 0;
+            width: 50%;
+            height: 100%;
+            touch-action: none;
+            z-index: 100;
+        }
+        .move-area {
             left: 0;
-            width: 50%;
-            height: 100%;
-            touch-action: none;
-            z-index: 100;
         }
-        .attack-zone {
-            position: fixed;
-            bottom: 0;
+        .attack-area {
             right: 0;
-            width: 50%;
-            height: 100%;
-            touch-action: none;
-            z-index: 100;
         }
-        .joystick {
-            position: absolute;
-            bottom: 40px;
-            left: 30px;
-            width: 120px;
-            height: 120px;
-            background: rgba(30,45,40,0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 50%;
-            box-shadow: 0 0 0 2px rgba(200,180,100,0.6);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            pointer-events: auto;
-        }
-        .joystick-base {
-            width: 90px;
-            height: 90px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 50%;
-            position: relative;
-        }
-        .joystick-thumb {
-            width: 45px;
-            height: 45px;
-            background: #d4c29b;
-            border-radius: 50%;
-            position: absolute;
-            top: 22.5px;
-            left: 22.5px;
-            box-shadow: 0 2px 8px black;
-            transition: transform 0.02s;
-        }
-        .aim-dot {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            background: #ffcc66;
-            border-radius: 50%;
-            border: 2px solid white;
-            transform: translate(-50%,-50%);
-            pointer-events: none;
-            z-index: 200;
-            display: none;
-        }
+        /* Интерфейс */
         .ui {
             position: fixed;
             top: 15px;
@@ -160,7 +114,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -184,12 +138,6 @@
             font-weight: bold;
             cursor: pointer;
         }
-        @media (max-width: 700px) {
-            .joystick { width: 100px; height: 100px; bottom: 25px; left: 20px; }
-            .joystick-base { width: 75px; height: 75px; }
-            .joystick-thumb { width: 38px; height: 38px; top: 18.5px; left: 18.5px; }
-            .reload-bar { bottom: 100px; }
-        }
         .instruction {
             position: fixed;
             bottom: 8px;
@@ -206,22 +154,24 @@
             pointer-events: none;
             z-index: 100;
         }
+        @media (max-width: 700px) {
+            .ui, .weapon-info { font-size: 12px; }
+            .reload-bar { bottom: 100px; }
+        }
     </style>
+    <!-- Подключаем библиотеку nipplejs -->
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
 </head>
 <body>
     <canvas id="canvas"></canvas>
-    <div class="move-zone" id="moveZone">
-        <div class="joystick">
-            <div class="joystick-base"><div class="joystick-thumb" id="thumb"></div></div>
-        </div>
-    </div>
-    <div class="attack-zone" id="attackZone"></div>
-    <div class="aim-dot" id="aimDot"></div>
+    <div class="joystick-area move-area" id="moveArea"></div>
+    <div class="joystick-area attack-area" id="attackArea"></div>
+    
     <div class="ui">❤️ <span id="hp">100</span> &nbsp;| 🧟 <span id="kills">0</span></div>
     <div class="weapon-info" id="weaponInfo">🗡️ Меч (28)</div>
     <div class="reload-bar"><div class="reload-fill" id="reloadFill"></div></div>
     <div class="boss-bar" id="bossBar"><div class="boss-fill" id="bossFill"></div></div>
-    <div class="instruction">👉 Левая половина — движение | Правая — прицел (вести) и отпустить для атаки</div>
+    <div class="instruction">👉 Левая зона — движение | Правая зона — атака (направление от центра)</div>
 
     <script>
         (function(){
@@ -251,7 +201,7 @@
 
             // ---------- ОРУЖИЕ ----------
             let weapon = {
-                type: 0,
+                type: 0, // 0-меч,1-арбалет,2-магия
                 name: "Меч",
                 damage: 28,
                 cd: 0,
@@ -432,112 +382,70 @@
             let decor = [];
             for(let i=0;i<150;i++) decor.push({ x:Math.random()*WORLD_W, y:Math.random()*WORLD_H });
 
-            // ---------- УПРАВЛЕНИЕ ДВИЖЕНИЕМ ----------
-            let moveVec = {x:0,y:0}, moveActive=false;
-            const thumb = document.getElementById('thumb');
-            const moveZoneDiv = document.getElementById('moveZone');
-            const baseRect = document.querySelector('.joystick-base');
-            function onMoveStart(e){
-                e.preventDefault();
-                moveActive=true;
-                updateMove(e);
-            }
-            function updateMove(e){
-                if(!moveActive) return;
-                const touch = e.touches ? e.touches[0] : e;
-                const rect = baseRect.getBoundingClientRect();
-                let dx = touch.clientX - (rect.left+rect.width/2);
-                let dy = touch.clientY - (rect.top+rect.height/2);
-                const maxD = rect.width/2;
-                let dist = Math.hypot(dx,dy);
-                if(dist>maxD){ dx=dx/dist*maxD; dy=dy/dist*maxD; }
-                thumb.style.transform = `translate(${dx}px, ${dy}px)`;
-                moveVec.x = dx/maxD;
-                moveVec.y = dy/maxD;
-            }
-            function onMoveEnd(){
-                moveActive=false;
-                moveVec={x:0,y:0};
-                thumb.style.transform = 'translate(0px,0px)';
-            }
-            moveZoneDiv.addEventListener('touchstart', onMoveStart);
-            moveZoneDiv.addEventListener('mousedown', onMoveStart);
-            window.addEventListener('touchmove', (e)=>{ if(moveActive){ e.preventDefault(); updateMove(e); } });
-            window.addEventListener('mousemove', (e)=>{ if(moveActive) updateMove(e); });
-            window.addEventListener('touchend', onMoveEnd);
-            window.addEventListener('mouseup', onMoveEnd);
-
-            // ---------- УПРАВЛЕНИЕ АТАКОЙ (ПРАВАЯ ЗОНА) ----------
-            let aiming = false;
-            let aimDir = { x:1, y:0 };
-            const attackDiv = document.getElementById('attackZone');
-            const aimDot = document.getElementById('aimDot');
-
-            function getPlayerScreenCenter() {
-                return {
-                    x: player.x - camera.x + PLAYER_W/2,
-                    y: player.y - camera.y + PLAYER_H/2
-                };
+            // ---------- УПРАВЛЕНИЕ С NIPPLEJS ----------
+            let moveVec = {x:0, y:0};
+            // Создаём джойстик для движения
+            const moveZone = document.getElementById('moveArea');
+            let moveJoystick = null;
+            if (typeof nipplejs !== 'undefined') {
+                moveJoystick = nipplejs.create({
+                    zone: moveZone,
+                    mode: 'static',
+                    lockY: false,
+                    lockX: false,
+                    size: 120,
+                    color: '#d4c29b',
+                    restOpacity: 0.7,
+                    restJoystick: true,
+                    shape: 'circle',
+                    dynamicPage: true
+                });
+                moveJoystick.on('move', function(evt, nipple) {
+                    const vector = nipple.vector;
+                    moveVec.x = vector.x;
+                    moveVec.y = vector.y;
+                }).on('end', function() {
+                    moveVec = {x:0, y:0};
+                });
             }
 
-            function updateAimDirectionFromTouch(clientX, clientY) {
-                const playerScreen = getPlayerScreenCenter();
-                let dx = clientX - playerScreen.x;
-                let dy = clientY - playerScreen.y;
-                let len = Math.hypot(dx, dy);
-                if (len > 0.001) {
-                    aimDir.x = dx / len;
-                    aimDir.y = dy / len;
-                } else {
-                    aimDir.x = 1; aimDir.y = 0;
-                }
+            // Создаём джойстик для атаки (при любом движении сразу атакуем)
+            const attackZone = document.getElementById('attackArea');
+            let attackJoystick = null;
+            let lastAttackTime = 0;
+            if (typeof nipplejs !== 'undefined') {
+                attackJoystick = nipplejs.create({
+                    zone: attackZone,
+                    mode: 'static',
+                    lockY: false,
+                    lockX: false,
+                    size: 110,
+                    color: '#ff8844',
+                    restOpacity: 0.7,
+                    restJoystick: true,
+                    shape: 'circle',
+                    dynamicPage: true
+                });
+                attackJoystick.on('move', function(evt, nipple) {
+                    const vector = nipple.vector;
+                    // Нормализованное направление атаки
+                    let dx = vector.x;
+                    let dy = vector.y;
+                    let len = Math.hypot(dx, dy);
+                    if (len > 0.01) {
+                        dx /= len;
+                        dy /= len;
+                    } else {
+                        dx = 1; dy = 0;
+                    }
+                    // Выполняем атаку, но не чаще чем раз в кадр (через CD оружия)
+                    performAttack({x: dx, y: dy});
+                }).on('end', function() {
+                    // Ничего не делаем
+                });
             }
 
-            function onAimStart(e) {
-                e.preventDefault();
-                const touch = e.touches ? e.touches[0] : e;
-                aiming = true;
-                // сразу устанавливаем направление от игрока к точке касания
-                updateAimDirectionFromTouch(touch.clientX, touch.clientY);
-                aimDot.style.display = 'block';
-                aimDot.style.left = touch.clientX + 'px';
-                aimDot.style.top = touch.clientY + 'px';
-            }
-
-            function onAimMove(e) {
-                if (!aiming) return;
-                e.preventDefault();
-                const touch = e.touches ? e.touches[0] : e;
-                // обновляем направление прицела по движению пальца
-                updateAimDirectionFromTouch(touch.clientX, touch.clientY);
-                aimDot.style.left = touch.clientX + 'px';
-                aimDot.style.top = touch.clientY + 'px';
-            }
-
-            function onAimEnd(e) {
-                if (!aiming) return;
-                e.preventDefault();
-                aiming = false;
-                aimDot.style.display = 'none';
-                if (weapon.cd <= 0) {
-                    performAttack(aimDir);
-                }
-            }
-
-            attackDiv.addEventListener('touchstart', onAimStart);
-            attackDiv.addEventListener('touchmove', onAimMove);
-            attackDiv.addEventListener('touchend', onAimEnd);
-            attackDiv.addEventListener('mousedown', onAimStart);
-            attackDiv.addEventListener('mousemove', (e) => { if (aiming) onAimMove(e); });
-            attackDiv.addEventListener('mouseup', onAimEnd);
-            // для ПК быстрый клик
-            attackDiv.addEventListener('click', (e) => {
-                if (window.innerWidth > 768 && weapon.cd <= 0) {
-                    updateAimDirectionFromTouch(e.clientX, e.clientY);
-                    performAttack(aimDir);
-                }
-            });
-
+            // ---------- АТАКА (вызывается из джойстика и с ПК) ----------
             function performAttack(dir) {
                 if (weapon.cd > 0) return;
                 if (weapon.type === 0) { // melee
@@ -584,16 +492,33 @@
                 weapon.cd = weapon.delay;
             }
 
-            // ---------- КЛАВИАТУРА ДЛЯ ДВИЖЕНИЯ ----------
+            // ---------- КЛАВИАТУРА (движение и атака) ----------
             let keyState = { w:false,s:false,a:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false };
             window.addEventListener('keydown', (e)=>{
                 let k = e.key;
                 if (keyState.hasOwnProperty(k)) { keyState[k]=true; e.preventDefault(); }
-                if (k === ' ') { e.preventDefault(); if (weapon.cd<=0) performAttack({x:player.dirX||1, y:player.dirY||0}); }
+                if (k === ' ' || k === 'Space') {
+                    e.preventDefault();
+                    if (weapon.cd <= 0) performAttack({x:player.dirX||1, y:player.dirY||0});
+                }
             });
             window.addEventListener('keyup', (e)=>{
                 let k = e.key;
                 if (keyState.hasOwnProperty(k)) keyState[k]=false;
+            });
+            // Атака мышью по области attackZone (для ПК)
+            attackZone.addEventListener('click', (e) => {
+                // Определяем направление от центра игрока к месту клика
+                const rect = attackZone.getBoundingClientRect();
+                const clickX = e.clientX;
+                const clickY = e.clientY;
+                const playerScreenX = player.x - camera.x + PLAYER_W/2;
+                const playerScreenY = player.y - camera.y + PLAYER_H/2;
+                let dx = clickX - playerScreenX;
+                let dy = clickY - playerScreenY;
+                let len = Math.hypot(dx, dy);
+                if (len > 0.01) { dx /= len; dy /= len; } else { dx = 1; dy = 0; }
+                if (weapon.cd <= 0) performAttack({x:dx, y:dy});
             });
 
             // ---------- ЛОГИКА ДВИЖЕНИЯ ----------
@@ -782,12 +707,7 @@
                 }
             }
             function drawAim() {
-                if (!aiming) return;
-                let sx=player.x-camera.x+PLAYER_W/2, sy=player.y-camera.y+PLAYER_H/2;
-                let ex=sx+aimDir.x*55, ey=sy+aimDir.y*55;
-                ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey);
-                ctx.strokeStyle='#ffcc88'; ctx.lineWidth=3; ctx.stroke();
-                ctx.beginPath(); ctx.arc(ex,ey,7,0,Math.PI*2); ctx.fillStyle='#ffaa55aa'; ctx.fill();
+                // В этой версии не показываем линию прицела, так как атака происходит мгновенно
             }
 
             // ---------- ГЛАВНЫЙ ЦИКЛ ----------
