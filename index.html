@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс наконец двигается</title>
+    <title>2.5D Adventure - Босс-мечник (финальная версия)</title>
     <style>
         * {
             margin: 0;
@@ -223,7 +223,7 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            // ---------- ОБЫЧНЫЙ ВРАГ (работает отлично) ----------
+            // ---------- ОБЫЧНЫЙ ВРАГ (РАБОТАЕТ ОТЛИЧНО) ----------
             class Enemy {
                 constructor(x, y, type="normal") {
                     this.x = x; this.y = y; this.w = 32; this.h = 32;
@@ -238,7 +238,7 @@
                     this.attackTimer = 0;
                 }
                 update(delta) {
-                    // ЭТА ЛОГИКА ДВИЖЕНИЯ РАБОТАЕТ НА 100%
+                    // ДВИЖЕНИЕ - РАБОЧАЯ ЛОГИКА
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -287,17 +287,20 @@
                 }
             }
             
-            // ---------- БОСС - ТОЧНО ТАКОЕ ЖЕ ДВИЖЕНИЕ, КАК У ENEMY ----------
-            class BossSwordsman {
+            // ---------- БОСС - НАСЛЕДНИК ENEMY, ПЕРЕОПРЕДЕЛЯЕМ ОТРИСОВКУ И АТАКУ ----------
+            class BossSwordsman extends Enemy {
                 constructor(x, y) {
-                    this.x = x;
-                    this.y = y;
+                    // Вызываем конструктор Enemy с типом "normal" (чтобы задать базовые параметры)
+                    super(x, y, "normal");
+                    // Переопределяем параметры
                     this.w = 76;
                     this.h = 76;
                     this.hp = 480;
                     this.maxHp = 480;
+                    this.speed = 3.2;           // быстрее обычного врага
+                    this.color = "#6a2c2c";      // цвет тела босса
+                    
                     this.phase = 1;
-                    this.speed = 3.2;       // скорость как у врага, но быстрее
                     this.attackCd = 0;
                     this.attackDelay = 0.9;
                     this.attackRadius = 96;
@@ -307,23 +310,24 @@
                     this.swingDuration = 0.22;
                 }
                 
+                // Переопределяем update, чтобы добавить свою атаку, но движение оставляем как у Enemy
                 update(delta) {
-                    // 100% ТА ЖЕ ЛОГИКА, ЧТО И У ENEMY
+                    // ДВИЖЕНИЕ - ТОЧНО ТАКОЕ ЖЕ, КАК У ENEMY (работает!)
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
-                    if (len > 0.5) {
-                        dx /= len;
-                        dy /= len;
+                    if(len > 0.1) {
+                        dx /= len; dy /= len;
                         this.x += dx * this.speed;
                         this.y += dy * this.speed;
                     }
-                    
-                    // Границы мира
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
-                    // Атака (круговая)
+                    // БОСС НЕ НАНОСИТ УРОН ПРИКОСНОВЕНИЕМ (как обычный враг), а использует круговую атаку
+                    // Убираем стандартную атаку Enemy, добавляем свою
+                    
+                    // Круговая атака
                     if (this.attackCd <= 0) {
                         const distToPlayer = Math.hypot(
                             (player.x + PLAYER_W/2) - (this.x + this.w/2),
@@ -356,9 +360,6 @@
                             });
                         }
                     }
-                    
-                    // Отладка: каждые 60 кадров выводим координаты (раскомментировать при необходимости)
-                    // if (Math.random() < 0.02) console.log("Босс на позиции:", this.x, this.y);
                 }
                 
                 performSwordAttack() {
@@ -400,6 +401,7 @@
                     }
                 }
                 
+                // Переопределяем отрисовку
                 draw(cam) {
                     let x = this.x - cam.x, y = this.y - cam.y;
                     if (x + this.w < 0 || x > canvas.width || y + this.h < 0 || y > canvas.height) return;
