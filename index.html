@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение: Раздельное управление</title>
+    <title>2.5D Приключение: Плавное управление</title>
     <style>
         * {
             margin: 0;
@@ -26,10 +26,9 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            cursor: crosshair;
             touch-action: none;
         }
-        /* Джойстик движения (только левая нижняя четверть) */
+        /* Джойстик движения (левая нижняя четверть) */
         .joystick-container {
             position: fixed;
             bottom: 40px;
@@ -45,7 +44,6 @@
             justify-content: center;
             align-items: center;
             z-index: 100;
-            pointer-events: auto;
         }
         .joystick-base {
             width: 110px;
@@ -67,7 +65,7 @@
             touch-action: none;
             cursor: grab;
         }
-        /* Прицельная точка (отображается только при прицеливании) */
+        /* Прицельная точка */
         .aim-dot {
             position: fixed;
             width: 24px;
@@ -150,6 +148,45 @@
             background: #e44;
             transition: width 0.2s;
         }
+        /* Окно смерти */
+        .death-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            font-family: system-ui;
+        }
+        .death-window {
+            background: #2a1f1a;
+            padding: 30px 40px;
+            border-radius: 40px;
+            text-align: center;
+            color: #ffccaa;
+            border: 2px solid #ff8844;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        .death-window h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        .death-window button {
+            background: #ff8844;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            border-radius: 40px;
+            color: #2a1f1a;
+            font-weight: bold;
+            margin-top: 20px;
+            cursor: pointer;
+        }
         @media (max-width: 768px) {
             .joystick-container { width: 120px; height: 120px; bottom: 25px; left: 20px; }
             .joystick-base { width: 95px; height: 95px; }
@@ -186,7 +223,7 @@
     <div class="weapon-info" id="weaponInfo">🗡️ Меч (урон 28)</div>
     <div class="reload-indicator"><div class="reload-fill" id="reloadFill"></div></div>
     <div class="boss-health" id="bossHealthBar"><div class="boss-fill" id="bossFill"></div></div>
-    <div class="instruction">👉 Левая зона (джойстик) — движение | Правая зона (вести палец, отпустить) — атака</div>
+    <div class="instruction">👉 Левая рука — джойстик (движение) | Правая рука — веди и отпусти для атаки</div>
 
     <script>
         (function(){
@@ -277,14 +314,12 @@
                 }
             }
             
-            // Спавн врагов со временем, чтобы можно было набрать убийства
             let enemySpawnTimer = 0;
             function spawnRandomEnemy() {
                 let x = player.x + (Math.random() - 0.5) * 800;
                 let y = player.y + (Math.random() - 0.5) * 800;
                 x = Math.min(Math.max(x, 100), WORLD_WIDTH-100);
                 y = Math.min(Math.max(y, 100), WORLD_HEIGHT-100);
-                // не спавнить прямо на игрока
                 if(Math.hypot(x - player.x, y - player.y) < 150) return;
                 enemies.push(new Enemy(x, y));
             }
@@ -421,10 +456,11 @@
             }
             function startMove(e){ e.preventDefault(); moveActive=true; updateMove(e); }
             function endMove(){ moveActive=false; moveVec={x:0,y:0}; moveThumb.style.transform='translate(0px,0px)'; }
-            document.getElementById('joystickContainer').addEventListener('touchstart',startMove);
-            window.addEventListener('touchmove',(e)=>{ if(moveActive){ e.preventDefault(); updateMove(e); } });
-            window.addEventListener('touchend',endMove);
-            document.getElementById('joystickContainer').addEventListener('mousedown',(e)=>{ e.preventDefault(); moveActive=true; updateMove(e); window.addEventListener('mousemove',onMoveMove); window.addEventListener('mouseup',onMoveUp); });
+            const joystickDiv = document.getElementById('joystickContainer');
+            joystickDiv.addEventListener('touchstart', startMove);
+            window.addEventListener('touchmove', (e)=>{ if(moveActive){ e.preventDefault(); updateMove(e); } });
+            window.addEventListener('touchend', endMove);
+            joystickDiv.addEventListener('mousedown', (e)=>{ e.preventDefault(); moveActive=true; updateMove(e); window.addEventListener('mousemove', onMoveMove); window.addEventListener('mouseup', onMoveUp); });
             function onMoveMove(e){ if(moveActive) updateMove(e); }
             function onMoveUp(){ endMove(); window.removeEventListener('mousemove',onMoveMove); window.removeEventListener('mouseup',onMoveUp); }
             
@@ -490,7 +526,7 @@
             canvas.addEventListener('mousemove', (e) => { if(aiming) handleAimMove(e); });
             canvas.addEventListener('mouseup', handleAimEnd);
             
-            // Для ПК также клик в правой зоне без зажатия (быстрый выстрел)
+            // Для ПК клик в правой зоне
             canvas.addEventListener('click', (e) => {
                 if(window.innerWidth > 768 && isInRightZone(e.clientX, e.clientY) && currentWeapon.attackCooldown <= 0) {
                     let rect = canvas.getBoundingClientRect();
@@ -581,7 +617,6 @@
                 }
                 if(player.invincibleTimer>0) player.invincibleTimer-=delta;
                 if(player.hp>player.maxHp) player.hp=player.maxHp;
-                if(player.hp<=0) alert("Вы погибли! Обновляем...") && location.reload();
                 document.getElementById('hpValue').innerText=Math.floor(player.hp);
             }
             
@@ -645,19 +680,43 @@
             }
             
             function checkBossSpawn() {
-                if(!boss && player.kills >= 5) {
-                    spawnBoss();
-                }
+                if(!boss && player.kills >= 5) spawnBoss();
                 if(boss) boss.update();
             }
             
-            // Спавн врагов каждые 10 секунд, чтобы всегда были противники
             function updateEnemySpawning(delta) {
-                if(boss) return; // если босс есть, новых врагов не спавним
+                if(boss) return;
                 enemySpawnTimer += delta;
                 if(enemySpawnTimer > 8.0 && enemies.length < 6) {
                     enemySpawnTimer = 0;
                     spawnRandomEnemy();
+                }
+            }
+            
+            // ---------- СМЕРТЬ И ВОЗРОЖДЕНИЕ ----------
+            let deathOverlay = null;
+            function showDeathScreen() {
+                if(deathOverlay) return;
+                deathOverlay = document.createElement('div');
+                deathOverlay.className = 'death-overlay';
+                deathOverlay.innerHTML = `
+                    <div class="death-window">
+                        <h2>💀 ВЫ ПОГИБЛИ 💀</h2>
+                        <p>Вы прошли путь, но силы иссякли...</p>
+                        <button id="restartButton">Возродиться</button>
+                    </div>
+                `;
+                document.body.appendChild(deathOverlay);
+                document.getElementById('restartButton').addEventListener('click', () => {
+                    location.reload();
+                });
+            }
+            
+            function checkPlayerDeath() {
+                if(player.hp <= 0) {
+                    showDeathScreen();
+                    // Останавливаем игру
+                    throw new Error("Game over");
                 }
             }
             
@@ -735,6 +794,7 @@
                     checkWeaponPickup();
                     updateEnemySpawning(delta);
                     checkBossSpawn();
+                    checkPlayerDeath();
                 }
                 lastTime=now;
                 updateCamera();
@@ -750,9 +810,15 @@
                 ctx.fillStyle='#c0e0a020'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
             }
             
-            function gameLoop(t){ render(t); requestAnimationFrame(gameLoop); }
+            function gameLoop(t){ 
+                try {
+                    render(t); 
+                    requestAnimationFrame(gameLoop);
+                } catch(e) {
+                    if(e.message !== "Game over") console.error(e);
+                }
+            }
             scatterWeapons();
-            // Начальные враги
             for(let i=0;i<6;i++) spawnRandomEnemy();
             gameLoop(performance.now());
         })();
