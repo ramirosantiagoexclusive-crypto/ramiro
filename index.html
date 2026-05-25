@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение - Свой спрайт персонажа</title>
+    <title>2.5D Приключение - Джойстик и клавиатура</title>
     <style>
         * {
             margin: 0;
@@ -22,6 +22,7 @@
             font-family: system-ui, 'Segoe UI', monospace;
             padding: 10px;
             touch-action: none; /* отключаем жесты браузера */
+            overflow: hidden;
         }
 
         .game-container {
@@ -29,6 +30,7 @@
             border-radius: 1.5rem;
             padding: 0.8rem;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            position: relative;
         }
 
         canvas {
@@ -55,6 +57,7 @@
             border-radius: 40px;
             color: #f9e2b7;
             font-weight: bold;
+            font-size: 14px;
         }
 
         .controls {
@@ -72,52 +75,52 @@
             font-size: 0.8rem;
         }
 
-        .upload-area {
-            background: #00000066;
-            padding: 4px 12px;
-            border-radius: 32px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            font-size: 0.8rem;
-        }
-
-        .upload-area input {
-            background: #d4c29b;
-            border: none;
-            border-radius: 20px;
-            padding: 4px 8px;
-            font-size: 0.7rem;
-        }
-
-        /* сенсорные кнопки */
-        .touch-panel {
+        /* Стили джойстика (только для сенсорных экранов) */
+        .joystick-container {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 130px;
+            height: 130px;
+            background: rgba(30, 45, 40, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px rgba(200, 180, 100, 0.6), 0 8px 20px rgba(0,0,0,0.3);
+            touch-action: none;
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin-top: 12px;
+            align-items: center;
+            z-index: 100;
         }
-        .touch-btn {
-            background: #1e2f28dd;
-            backdrop-filter: blur(8px);
-            border: none;
-            color: #ffefc0;
-            font-size: 2rem;
-            padding: 8px 20px;
-            border-radius: 60px;
-            font-weight: bold;
-            touch-action: manipulation;
-            box-shadow: 0 4px 0 #0a1915;
-            transition: 0.05s linear;
-            cursor: pointer;
+        .joystick-base {
+            width: 100px;
+            height: 100px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
         }
-        .touch-btn:active {
-            transform: translateY(2px);
-            box-shadow: 0 1px 0 #0a1915;
+        .joystick-thumb {
+            width: 50px;
+            height: 50px;
+            background: #d4c29b;
+            border-radius: 50%;
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            box-shadow: 0 2px 8px black;
+            transition: transform 0.02s linear;
+            touch-action: none;
+            cursor: grab;
         }
-        @media (max-width: 700px) {
-            .touch-btn { font-size: 1.8rem; padding: 6px 18px; }
-            .controls span { font-size: 0.7rem; }
+        @media (max-width: 768px) {
+            .joystick-container { width: 110px; height: 110px; bottom: 20px; left: 20px; }
+            .joystick-base { width: 85px; height: 85px; }
+            .joystick-thumb { width: 42px; height: 42px; top: 21px; left: 21px; }
+        }
+        @media (hover: hover) {
+            /* на устройствах с мышью джойстик не отображаем, чтобы не мешать */
+            .joystick-container { display: none; }
         }
     </style>
 </head>
@@ -128,21 +131,16 @@
         <div class="info-panel">
             <div class="controls">
                 <span>⌨️ WASD / стрелки</span>
-                <span>📱 сенсорные кнопки</span>
+                <span>🕹️ левый нижний джойстик (тач)</span>
             </div>
-            <div class="upload-area">
-                🎨 Свой спрайт: 
-                <input type="file" id="spriteUpload" accept="image/png, image/jpeg, image/webp">
+            <div>
+                🧭 Исследуйте мир • стены скрывают
             </div>
         </div>
-        <div class="touch-panel" id="touchControls">
-            <button class="touch-btn" data-dir="up">▲</button>
-            <button class="touch-btn" data-dir="left">◀</button>
-            <button class="touch-btn" data-dir="down">▼</button>
-            <button class="touch-btn" data-dir="right">▶</button>
-        </div>
-        <div style="font-size:11px; text-align:center; margin-top:6px; color:#bcdaa7;">
-            💡 Загрузите спрайт-лист 4x4 (16 кадров, 64x64 или 128x128). Пример файла прилагается.
+    </div>
+    <div class="joystick-container" id="joystickContainer">
+        <div class="joystick-base" id="joystickBase">
+            <div class="joystick-thumb" id="joystickThumb"></div>
         </div>
     </div>
 </div>
@@ -153,13 +151,17 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        // Адаптивный размер canvas (сохраняем игровое поле, но камера подстраивается)
-        let CANVAS_W = 900;
-        let CANVAS_H = 600;
-        function resizeCanvas() {
+        // Размеры экрана (фиксированная логика, камера подстраивается)
+        const CANVAS_W = 900;
+        const CANVAS_H = 600;
+        canvas.width = CANVAS_W;
+        canvas.height = CANVAS_H;
+        
+        // Адаптивный CSS размер (чтобы не ломалось)
+        function resizeCanvasCSS() {
             const container = canvas.parentElement;
             const maxWidth = Math.min(window.innerWidth - 40, 1100);
-            const maxHeight = window.innerHeight * 0.65;
+            const maxHeight = window.innerHeight * 0.7;
             let ratio = CANVAS_W / CANVAS_H;
             let newWidth = maxWidth;
             let newHeight = newWidth / ratio;
@@ -169,11 +171,9 @@
             }
             canvas.style.width = `${newWidth}px`;
             canvas.style.height = `${newHeight}px`;
-            canvas.width = CANVAS_W;
-            canvas.height = CANVAS_H;
         }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        window.addEventListener('resize', resizeCanvasCSS);
+        resizeCanvasCSS();
         
         const WORLD_WIDTH = 2800;
         const WORLD_HEIGHT = 2200;
@@ -186,11 +186,10 @@
             y: WORLD_HEIGHT / 2,
             dirX: 0,
             dirY: 1,
-            frame: 0,
             animTime: 0
         };
         
-        // ----- СТЕНЫ (без изменений) -----
+        // ----- СТЕНЫ (полный набор) -----
         let walls = [];
         function addWall(x,y,w,h){ walls.push({x,y,w,h}); }
         function initWalls() {
@@ -209,12 +208,14 @@
         }
         initWalls();
         
-        // декорации (кусты, камни)
+        // Декорации (кусты/камни)
         let decorations = [];
         for(let i=0;i<180;i++) decorations.push({ x: Math.random()*WORLD_WIDTH, y: Math.random()*WORLD_HEIGHT, type: Math.floor(Math.random()*3) });
         
-        // ----- УПРАВЛЕНИЕ (клавиатура + тач) -----
+        // ----- УПРАВЛЕНИЕ: клавиатура + джойстик -----
         const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false };
+        
+        // Клавиатура
         window.addEventListener('keydown', (e) => {
             let k = e.key;
             if(keys.hasOwnProperty(k)) { keys[k]=true; e.preventDefault(); }
@@ -232,15 +233,83 @@
             if(k==='d'||k==='D') keys.d=false;
         });
         
-        // сенсорные кнопки
-        const touchBtns = document.querySelectorAll('.touch-btn');
-        let touchDir = { up:false, down:false, left:false, right:false };
-        touchBtns.forEach(btn => {
-            btn.addEventListener('touchstart', (e) => { e.preventDefault(); let d = btn.dataset.dir; if(d) touchDir[d]=true; });
-            btn.addEventListener('touchend', (e) => { e.preventDefault(); let d = btn.dataset.dir; if(d) touchDir[d]=false; });
-            btn.addEventListener('mousedown', () => { let d = btn.dataset.dir; if(d) touchDir[d]=true; });
-            btn.addEventListener('mouseup', () => { let d = btn.dataset.dir; if(d) touchDir[d]=false; });
+        // ----- ДЖОЙСТИК (сенсорный) -----
+        let joystickActive = false;
+        let joystickVector = { x: 0, y: 0 };
+        const joystickContainer = document.getElementById('joystickContainer');
+        const joystickBase = document.getElementById('joystickBase');
+        const joystickThumb = document.getElementById('joystickThumb');
+        
+        function getTouchPos(touch, element) {
+            const rect = element.getBoundingClientRect();
+            const scaleX = element.offsetWidth / rect.width; // но для координат внутри элемента используем client
+            const scaleY = element.offsetHeight / rect.height;
+            let x = (touch.clientX - rect.left) * scaleX;
+            let y = (touch.clientY - rect.top) * scaleY;
+            return { x, y };
+        }
+        
+        function handleJoystickStart(e) {
+            e.preventDefault();
+            joystickActive = true;
+            updateJoystick(e);
+        }
+        
+        function updateJoystick(e) {
+            if (!joystickActive) return;
+            const touch = e.touches ? e.touches[0] : e;
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width/2;
+            const centerY = rect.top + rect.height/2;
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const maxDist = rect.width/2;
+            let dist = Math.hypot(dx, dy);
+            if (dist > maxDist) {
+                dx = dx / dist * maxDist;
+                dy = dy / dist * maxDist;
+                dist = maxDist;
+            }
+            // перемещаем thumb
+            joystickThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+            // нормализуем вектор от -1 до 1
+            let normX = dx / maxDist;
+            let normY = dy / maxDist;
+            joystickVector.x = normX;
+            joystickVector.y = normY;
+        }
+        
+        function handleJoystickEnd(e) {
+            joystickActive = false;
+            joystickVector.x = 0;
+            joystickVector.y = 0;
+            joystickThumb.style.transform = `translate(0px, 0px)`;
+        }
+        
+        joystickContainer.addEventListener('touchstart', handleJoystickStart);
+        window.addEventListener('touchmove', (e) => {
+            if (joystickActive) {
+                e.preventDefault();
+                updateJoystick(e);
+            }
         });
+        window.addEventListener('touchend', handleJoystickEnd);
+        // для мыши (если нужно отлаживать на десктопе, но скрыто) - опционально
+        joystickContainer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            joystickActive = true;
+            updateJoystick(e);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+        function onMouseMove(e) {
+            if (joystickActive) updateJoystick(e);
+        }
+        function onMouseUp() {
+            handleJoystickEnd();
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        }
         
         // ----- КОЛЛИЗИИ -----
         function collision(newX, newY, w, h){
@@ -251,30 +320,48 @@
         }
         
         function updateMovement() {
-            let moveX=0, moveY=0;
-            if(keys.ArrowUp||keys.w||touchDir.up) moveY-=1;
-            if(keys.ArrowDown||keys.s||touchDir.down) moveY+=1;
-            if(keys.ArrowLeft||keys.a||touchDir.left) moveX-=1;
-            if(keys.ArrowRight||keys.d||touchDir.right) moveX+=1;
-            if(moveX!==0 || moveY!==0) { player.dirX=moveX; player.dirY=moveY; }
-            let len=Math.hypot(moveX,moveY);
-            if(len>0){ moveX/=len; moveY/=len; }
-            let deltaX=moveX*MOVE_SPEED, deltaY=moveY*MOVE_SPEED;
-            let newX=player.x+deltaX;
-            if(!collision(newX,player.y,PLAYER_W,PLAYER_H)) player.x=newX;
+            let moveX = 0, moveY = 0;
+            // клавиатура
+            if(keys.ArrowUp||keys.w) moveY-=1;
+            if(keys.ArrowDown||keys.s) moveY+=1;
+            if(keys.ArrowLeft||keys.a) moveX-=1;
+            if(keys.ArrowRight||keys.d) moveX+=1;
+            // джойстик (приоритет суммирования)
+            if(joystickVector.x !==0 || joystickVector.y !==0){
+                moveX += joystickVector.x;
+                moveY += joystickVector.y;
+                // ограничим длину
+                let len = Math.hypot(moveX, moveY);
+                if(len>1){ moveX/=len; moveY/=len; }
+            }
+            
+            if(moveX!==0 || moveY!==0) { 
+                player.dirX = moveX; 
+                player.dirY = moveY; 
+                player.animTime += 0.2;
+            } else {
+                player.animTime = 0;
+            }
+            
+            let lenM = Math.hypot(moveX,moveY);
+            if(lenM>0){ moveX/=lenM; moveY/=lenM; }
+            let deltaX = moveX * MOVE_SPEED;
+            let deltaY = moveY * MOVE_SPEED;
+            
+            // X
+            let newX = player.x + deltaX;
+            if(!collision(newX, player.y, PLAYER_W, PLAYER_H)) player.x = newX;
             else {
-                let stepX=Math.sign(deltaX)*1.6;
+                let stepX = Math.sign(deltaX)*1.6;
                 for(let i=0;i<2;i++) { let tx=player.x+stepX; if(!collision(tx,player.y,PLAYER_W,PLAYER_H)){ player.x=tx; break; } stepX*=0.6; }
             }
-            let newY=player.y+deltaY;
-            if(!collision(player.x,newY,PLAYER_W,PLAYER_H)) player.y=newY;
+            // Y
+            let newY = player.y + deltaY;
+            if(!collision(player.x, newY, PLAYER_W, PLAYER_H)) player.y = newY;
             else {
-                let stepY=Math.sign(deltaY)*1.6;
-                for(let i=0;i<2;i++) { let ty=player.y+stepY; if(!collision(player.x,ty,PLAYER_W,PLAYER_H)){ player.y=ty; break; } stepY*=0.6; }
+                let stepY = Math.sign(deltaY)*1.6;
+                for(let i=0;i<2;i++) { let ty=player.y+stepY; if(!collision(player.x, ty, PLAYER_W, PLAYER_H)){ player.y=ty; break; } stepY*=0.6; }
             }
-            // анимация
-            if(moveX!==0 || moveY!==0) player.animTime+=0.2;
-            else player.animTime=0;
         }
         
         // ----- КАМЕРА -----
@@ -286,14 +373,14 @@
             camera.y = Math.min(Math.max(0,ty), WORLD_HEIGHT-CANVAS_H);
         }
         
-        // ========== 1. ПОЛ (только травяной градиент + декор, НИКАКОЙ ДВИЖУЩЕЙСЯ СЕТКИ) ==========
+        // ========== ОТРИСОВКА ==========
         function drawGround() {
             const grad = ctx.createLinearGradient(0, CANVAS_H, 0, 0);
             grad.addColorStop(0, '#5d9652');
             grad.addColorStop(1, '#2b522c');
             ctx.fillStyle = grad;
             ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-            // мелкие точечки-травинки по миру
+            // травяные точки
             for(let i=0;i<500;i++) {
                 let worldX = (i*311)%WORLD_WIDTH;
                 let worldY = (i*457)%WORLD_HEIGHT;
@@ -308,7 +395,6 @@
             }
         }
         
-        // стены (объёмные)
         function drawWall(wall){
             let x = wall.x - camera.x, y = wall.y - camera.y, w = wall.w, h = wall.h;
             if(x+w<0 || x>CANVAS_W || y+h<0 || y>CANVAS_H) return;
@@ -348,163 +434,135 @@
             ctx.shadowBlur=0;
         }
         
-        // ========== РАБОТА СО СПРАЙТАМИ ПЕРСОНАЖА ==========
-        let playerSprite = null;      // загруженное изображение
-        let spriteReady = false;
-        let spriteConfig = { cols:4, rows:4, frameW:32, frameH:32 }; // базовые размеры, будут пересчитаны
-        
-        // загрузка пользовательского спрайта
-        const spriteInput = document.getElementById('spriteUpload');
-        spriteInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if(!file) return;
-            const img = new Image();
-            img.onload = () => {
-                playerSprite = img;
-                // анализируем: ожидаем квадратную сетку, делим на 4x4
-                const frameW = img.width / 4;
-                const frameH = img.height / 4;
-                if(frameW>0 && frameH>0){
-                    spriteConfig.frameW = frameW;
-                    spriteConfig.frameH = frameH;
-                    spriteReady = true;
-                } else { spriteReady = false; }
-            };
-            img.onerror = () => { alert("Не удалось загрузить изображение"); spriteReady=false; };
-            img.src = URL.createObjectURL(file);
-        });
-        
-        // направление -> индекс строки (0=вниз, 1=влево, 2=вправо, 3=вверх)
-        function getDirectionRow(dirX, dirY) {
-            if(Math.abs(dirX) > Math.abs(dirY)) {
-                return dirX > 0 ? 2 : 1;   // вправо или влево
-            } else {
-                return dirY > 0 ? 0 : 3;   // вниз или вверх
-            }
-        }
-        
-        // отрисовка персонажа (спрайт либо fallback)
+        // Персонаж (стильный 2.5D с анимацией)
         function drawPlayer() {
             const px = player.x - camera.x;
             const py = player.y - camera.y;
             const centerX = px + PLAYER_W/2;
             const centerY = py + PLAYER_H/2;
+            
             // тень
             ctx.fillStyle = 'rgba(0,0,0,0.45)';
             ctx.beginPath();
             ctx.ellipse(centerX+4, centerY+7, 22, 11, 0, 0, Math.PI*2);
             ctx.fill();
             
-            if(spriteReady && playerSprite) {
-                // анимация: кадр меняется каждые 0.2 секунды, три фазы (0,1,2)
-                let animStep = 0;
-                if(player.animTime > 0) {
-                    animStep = Math.floor(player.animTime) % 3; // 0,1,2
-                }
-                let row = getDirectionRow(player.dirX, player.dirY);
-                let col = animStep;
-                let sx = col * spriteConfig.frameW;
-                let sy = row * spriteConfig.frameH;
-                let drawW = PLAYER_W;
-                let drawH = PLAYER_H;
-                let offsetX = centerX - drawW/2;
-                let offsetY = centerY - drawH/2;
-                ctx.drawImage(playerSprite, sx, sy, spriteConfig.frameW, spriteConfig.frameH, offsetX, offsetY, drawW, drawH);
-                // легкий контур для читаемости
-                ctx.strokeStyle = '#3a2a1a';
-                ctx.lineWidth = 1.2;
-                ctx.strokeRect(offsetX+1, offsetY+1, drawW-2, drawH-2);
-            } else {
-                // fallback, если спрайт не загружен – рисуем объёмного человечка
-                let bodyGrad = ctx.createLinearGradient(centerX-8, centerY-6, centerX+8, centerY+12);
-                bodyGrad.addColorStop(0, '#628e84'); bodyGrad.addColorStop(1, '#3b6b5e');
-                ctx.fillStyle = bodyGrad;
-                ctx.beginPath(); ctx.ellipse(centerX, centerY+3, 19, 21, 0, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#2a5549';
-                ctx.beginPath(); ctx.moveTo(centerX-16,centerY+2); ctx.quadraticCurveTo(centerX-6,centerY+18,centerX+14,centerY+2); ctx.fill();
-                ctx.fillStyle = '#c9894b'; ctx.fillRect(centerX-12,centerY+5,24,5);
-                ctx.fillStyle = '#4f786c';
-                ctx.beginPath(); ctx.ellipse(centerX,centerY-9,15,16,0,0,Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#faf4e0';
-                let eyeX = (player.dirX!==0||player.dirY!==0)?player.dirX*2:0;
-                let eyeY = (player.dirX!==0||player.dirY!==0)?player.dirY*1.5:1;
-                ctx.beginPath(); ctx.ellipse(centerX-8+eyeX*0.4, centerY-12+eyeY*0.6, 4.2,4.8,0,0,Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(centerX+5+eyeX*0.4, centerY-12+eyeY*0.6,4.2,4.8,0,0,Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#1f2f28';
-                ctx.beginPath(); ctx.ellipse(centerX-8+eyeX, centerY-11+eyeY*0.8,2.2,2.8,0,0,Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(centerX+5+eyeX, centerY-11+eyeY*0.8,2.2,2.8,0,0,Math.PI*2); ctx.fill();
-                ctx.fillStyle = 'white';
-                ctx.beginPath(); ctx.arc(centerX-9+eyeX*0.7, centerY-12.5+eyeY*0.5,1,0,Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(centerX+4+eyeX*0.7, centerY-12.5+eyeY*0.5,1,0,Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.moveTo(centerX+15,centerY-2); ctx.lineTo(centerX+26,centerY-12); ctx.lineTo(centerX+24,centerY-14); ctx.fillStyle='#c0a16b'; ctx.fill();
-            }
+            // Анимация шага (легкое покачивание)
+            let step = Math.sin(player.animTime * Math.PI) * 2;
+            
+            // Тело
+            let bodyGrad = ctx.createLinearGradient(centerX-8, centerY-6+step*0.5, centerX+8, centerY+12+step*0.3);
+            bodyGrad.addColorStop(0, '#628e84');
+            bodyGrad.addColorStop(1, '#3b6b5e');
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY+3+step*0.2, 19, 21, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Плащ
+            ctx.fillStyle = '#2a5549';
+            ctx.beginPath();
+            ctx.moveTo(centerX-16, centerY+2+step*0.1);
+            ctx.quadraticCurveTo(centerX-6, centerY+18+step*0.3, centerX+14, centerY+2+step*0.1);
+            ctx.fill();
+            
+            // Пояс
+            ctx.fillStyle = '#c9894b';
+            ctx.fillRect(centerX-12, centerY+5+step*0.1, 24, 5);
+            
+            // Голова
+            ctx.fillStyle = '#4f786c';
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY-9+step*0.1, 15, 16, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#6b9888';
+            ctx.beginPath();
+            ctx.ellipse(centerX-2, centerY-12+step*0.1, 9, 10, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Глаза смотрят по направлению движения
+            let eyeX = (player.dirX !== 0 || player.dirY !== 0) ? player.dirX * 2.2 : 0;
+            let eyeY = (player.dirX !== 0 || player.dirY !== 0) ? player.dirY * 1.6 : 1.2;
+            ctx.fillStyle = '#faf4e0';
+            ctx.beginPath();
+            ctx.ellipse(centerX-8 + eyeX*0.4, centerY-12 + eyeY*0.6 + step*0.05, 4.2, 4.8, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX+5 + eyeX*0.4, centerY-12 + eyeY*0.6 + step*0.05, 4.2, 4.8, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#1f2f28';
+            ctx.beginPath();
+            ctx.ellipse(centerX-8 + eyeX, centerY-11 + eyeY*0.8 + step*0.05, 2.2, 2.8, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX+5 + eyeX, centerY-11 + eyeY*0.8 + step*0.05, 2.2, 2.8, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(centerX-9 + eyeX*0.7, centerY-12.5 + eyeY*0.5 + step*0.05, 1, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX+4 + eyeX*0.7, centerY-12.5 + eyeY*0.5 + step*0.05, 1, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Брови
+            ctx.beginPath();
+            ctx.strokeStyle = '#2d423a';
+            ctx.lineWidth = 2;
+            ctx.moveTo(centerX-13, centerY-17+step*0.05);
+            ctx.quadraticCurveTo(centerX-9, centerY-20+step*0.05, centerX-5, centerY-17.5+step*0.05);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(centerX+2, centerY-17.5+step*0.05);
+            ctx.quadraticCurveTo(centerX+6, centerY-20+step*0.05, centerX+11, centerY-17+step*0.05);
+            ctx.stroke();
+            
+            // Посох / оружие
+            ctx.beginPath();
+            ctx.moveTo(centerX+15, centerY-2+step*0.1);
+            ctx.lineTo(centerX+26, centerY-12+step*0.1);
+            ctx.lineTo(centerX+24, centerY-14+step*0.1);
+            ctx.fillStyle = '#c0a16b';
+            ctx.fill();
+            ctx.fillStyle = '#e7c27d';
+            ctx.fillRect(centerX+16, centerY-6+step*0.1, 4, 12);
         }
         
-        // ----- ОТРИСОВКА ВСЕГО С СОРТИРОВКОЙ ПО ГЛУБИНЕ -----
+        // ----- ОТРИСОВКА СЦЕНЫ С ГЛУБИНОЙ (сортировка) -----
         function renderScene() {
             updateCamera();
             drawGround();
-            // собираем объекты для сортировки
+            
             let objects = [];
             for(let w of walls) objects.push({type:'wall', y: w.y+w.h+22, draw:()=>drawWall(w)});
             for(let d of decorations) objects.push({type:'decor', y: d.y+12, draw:()=>drawDecor(d)});
             objects.push({type:'player', y: player.y+PLAYER_H, draw:()=>drawPlayer()});
             objects.sort((a,b)=>a.y - b.y);
             for(let obj of objects) obj.draw();
-            // легкая дымка
+            
+            // Легкая туманная дымка
             ctx.fillStyle = '#c0e0a030';
             ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
             const fog = ctx.createLinearGradient(0,0,0,CANVAS_H*0.5);
             fog.addColorStop(0,'#bcdd9a40'); fog.addColorStop(1,'transparent');
             ctx.fillStyle = fog; ctx.fillRect(0,0,CANVAS_W,CANVAS_H*0.4);
-            // UI подсказки
-            ctx.font = 'bold 12px system-ui'; ctx.fillStyle = '#ffefc0'; ctx.shadowBlur=0;
-            ctx.fillText('📱 Сенсорные кнопки внизу', CANVAS_W-160, 25);
-            if(!spriteReady) ctx.fillText('⬆️ Загрузите спрайт-лист персонажа (4x4 кадра)', 15, 30);
-            else ctx.fillText('✔️ Свой спрайт загружен', 15, 30);
+            
+            // Текст подсказки
+            ctx.font = 'bold 12px system-ui';
+            ctx.fillStyle = '#ffefc0';
+            ctx.shadowBlur = 0;
+            ctx.fillText('🕹️ Левый нижний джойстик (тач)', CANVAS_W-170, 25);
+            ctx.fillText('💻 WASD / стрелки', 15, 25);
         }
         
-        // ----- СОЗДАНИЕ ПРИМЕРНОГО ФАЙЛА СПРАЙТОВ (инструкция) -----
-        function generateSampleSprite() {
-            // создаём canvas и предлагаем скачать пример
-            const canvasSpr = document.createElement('canvas');
-            const size = 128; // 4x4, каждый кадр 32x32
-            canvasSpr.width = size;
-            canvasSpr.height = size;
-            const ctxSpr = canvasSpr.getContext('2d');
-            ctxSpr.fillStyle = '#3f786e';
-            ctxSpr.fillRect(0,0,size,size);
-            ctxSpr.fillStyle = '#f5d742';
-            ctxSpr.font = 'bold 22px monospace';
-            ctxSpr.textAlign = 'center';
-            ctxSpr.fillText('★', size/2, size/2);
-            ctxSpr.fillStyle = '#00000099';
-            for(let i=0;i<4;i++) ctxSpr.strokeRect(i*32,0,32,32);
-            for(let i=0;i<4;i++) ctxSpr.strokeRect(0,i*32,32,32);
-            const link = document.createElement('a');
-            link.download = 'example_sprite_4x4.png';
-            link.href = canvasSpr.toDataURL();
-            link.click();
-        }
-        // добавим возможность скачать пример, но не автоматически (по желанию)
-        window.generateSample = generateSampleSprite;
-        
-        // Инструкция: в консоль или вывести кнопку? Добавим маленькую ссылку в панель
-        const uploadDiv = document.querySelector('.upload-area');
-        const sampleBtn = document.createElement('button');
-        sampleBtn.innerText = '📥 Скачать пример спрайта';
-        sampleBtn.style.background = '#c9a87b'; sampleBtn.style.border = 'none'; sampleBtn.style.borderRadius = '20px'; sampleBtn.style.marginLeft = '8px'; sampleBtn.style.padding = '2px 8px'; sampleBtn.style.fontSize = '10px';
-        sampleBtn.onclick = () => generateSampleSprite();
-        uploadDiv.appendChild(sampleBtn);
-        
-        // ----- АНИМАЦИОННЫЙ ЦИКЛ -----
+        // ----- ИГРОВОЙ ЦИКЛ -----
         function gameLoop() {
             updateMovement();
             renderScene();
             requestAnimationFrame(gameLoop);
         }
         
-        // предварительная корректировка стартовой позиции
+        // Убираем спавн в стене
         while(collision(player.x, player.y, PLAYER_W, PLAYER_H)) {
             player.x += 30; player.y += 30;
             if(player.x > WORLD_WIDTH-100) player.x = WORLD_WIDTH/2;
