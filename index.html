@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Красочная версия с комбо</title>
+    <title>2.5D Adventure - Улучшенный геймплей</title>
     <style>
         * {
             margin: 0;
@@ -53,8 +53,8 @@
             z-index: 200;
             pointer-events: none;
             display: flex;
-            gap: 15px;
-            font-size: 12px;
+            gap: 12px;
+            font-size: 11px;
             backdrop-filter: blur(4px);
             flex-wrap: wrap;
         }
@@ -69,7 +69,7 @@
             font-weight: bold;
             z-index: 200;
             pointer-events: none;
-            font-size: 12px;
+            font-size: 11px;
             backdrop-filter: blur(4px);
         }
         .reload-bar {
@@ -97,10 +97,11 @@
             padding: 4px 8px;
             border-radius: 12px;
             color: #aaf;
-            font-size: 11px;
+            font-size: 10px;
             z-index: 200;
             pointer-events: none;
             backdrop-filter: blur(4px);
+            max-width: 40%;
         }
         .combo-counter {
             position: fixed;
@@ -111,11 +112,55 @@
             border-radius: 20px;
             color: #ffaa44;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             z-index: 200;
             pointer-events: none;
             backdrop-filter: blur(4px);
         }
+        .wave-indicator {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 4px 12px;
+            border-radius: 20px;
+            color: #ffaa88;
+            font-weight: bold;
+            font-size: 12px;
+            z-index: 200;
+            backdrop-filter: blur(4px);
+            white-space: nowrap;
+        }
+        .level-up-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 20px;
+            border-radius: 30px;
+            z-index: 400;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa44;
+            min-width: 250px;
+        }
+        .level-up-panel h3 { color: #ffaa44; margin-bottom: 10px; }
+        .level-up-btn {
+            background: #2a2a2a;
+            color: white;
+            border: 1px solid #ffaa44;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .level-up-btn:active { background: #ffaa44; color: black; transform: scale(0.96); }
         .death-screen {
             position: fixed;
             top: 0;
@@ -153,7 +198,7 @@
             right: 0;
             text-align: center;
             color: #ccc;
-            font-size: 10px;
+            font-size: 9px;
             background: rgba(0,0,0,0.4);
             width: fit-content;
             margin: 0 auto;
@@ -163,9 +208,9 @@
             z-index: 200;
         }
         @media (max-width: 700px) {
-            .ui, .weapon-info { font-size: 10px; gap: 8px; }
-            .reload-bar { bottom: 100px; }
+            .ui, .weapon-info { font-size: 9px; gap: 6px; }
             .combo-counter { bottom: 110px; font-size: 14px; }
+            .wave-indicator { font-size: 10px; top: 60px; }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
@@ -178,14 +223,23 @@
     <div class="ui">
         <span>❤️ <span id="hp">100</span></span>
         <span>🧟 <span id="kills">0</span></span>
+        <span>⭐ Lv.<span id="level">1</span></span>
         <span>⚡ <span id="speedBuff">0</span>%</span>
         <span>🛡️ <span id="armorBuff">0</span></span>
     </div>
     <div class="weapon-info" id="weaponInfo">🗡️ Меч (28)</div>
     <div class="reload-bar"><div class="reload-fill" id="reloadFill"></div></div>
-    <div class="buff-indicator" id="buffIndicator">✨ Нет активных баффов</div>
+    <div class="buff-indicator" id="buffIndicator">✨ Нет баффов</div>
     <div class="combo-counter" id="comboCounter">🔥 0 комбо</div>
-    <div class="instruction">👉 Движение слева | Атака справа (направление от центра)</div>
+    <div class="wave-indicator" id="waveIndicator">Волна 1</div>
+    <div class="instruction">👉 Левая зона — движение | Правая зона — атака (направление от центра)</div>
+    <div class="level-up-panel" id="levelUpPanel">
+        <h3>🎉 УРОВЕНЬ ПОВЫШЕН!</h3>
+        <button class="level-up-btn" id="upgradeDamage">⚔️ +5 урона</button>
+        <button class="level-up-btn" id="upgradeSpeed">🏃 +10% скорости</button>
+        <button class="level-up-btn" id="upgradeHealth">❤️ +15 макс. здоровья</button>
+        <button class="level-up-btn" id="upgradeAttackSpeed">⚡ -10% задержки атаки</button>
+    </div>
 
     <script>
         (function(){
@@ -207,52 +261,57 @@
                 kills: 0,
                 speedBonus: 0,
                 armorBonus: 0,
-                combo: 0,
-                comboTime: 0,     // время до сброса комбо
-                lastKillTime: 0
+                level: 1,
+                experience: 0,
+                expToNext: 100,
+                damageBonus: 0,
+                attackSpeedBonus: 0  // уменьшает задержку оружия
             };
             
-            // Типы врагов (добавлен взрывающийся)
-            const enemyTypes = {
-                normal: { hp: 45, speed: 1.3, damage: 12, color: "#4a6e5c", size: 32, exp: 10, name: "Гниль", knockbackResist: 0 },
-                fast:   { hp: 30, speed: 2.2, damage: 10, color: "#c44", size: 32, exp: 12, name: "Шустрый", knockbackResist: 0 },
-                tank:   { hp: 100, speed: 0.8, damage: 15, color: "#48a", size: 38, exp: 20, name: "Танк", knockbackResist: 0.7 },
-                mage:   { hp: 35, speed: 1.0, damage: 18, color: "#a5a", size: 32, exp: 15, name: "Маг", ranged: true, projDamage: 14, projSpeed: 5, knockbackResist: 0 },
-                berserk:{ hp: 55, speed: 1.8, damage: 20, color: "#e74", size: 34, exp: 18, name: "Берсерк", knockbackResist: 0.3 },
-                summoner:{ hp: 40, speed: 0.9, damage: 8, color: "#6a8", size: 36, exp: 25, name: "Призыватель", summonCooldown: 0, knockbackResist: 0.2 },
-                exploder:{ hp: 25, speed: 1.5, damage: 25, color: "#f84", size: 30, exp: 15, name: "Камикадзе", explode: true, knockbackResist: 0 }
-            };
-            
+            // Оружие (урон базовый + бонус)
             const weaponsLib = [
-                { type:0, name:"Меч", damage:28, delay:0.5, range:75, projSpeed:0, color:"#c0a16b", emoji:"🗡️", knockback:40 },
-                { type:1, name:"Арбалет", damage:18, delay:0.7, range:500, projSpeed:9, color:"#b87c4f", emoji:"🏹", knockback:0 },
-                { type:2, name:"Посох", damage:42, delay:1.1, range:550, projSpeed:7, color:"#aa66ff", emoji:"🔮", knockback:25 },
-                { type:3, name:"Кинжал", damage:22, delay:0.35, range:60, projSpeed:0, color:"#cdb", emoji:"🗡️", knockback:25 }
+                { type:0, name:"Меч", baseDamage:28, delay:0.5, range:75, projSpeed:0, color:"#c0a16b", emoji:"🗡️", knockback:45, projectileEffect: null },
+                { type:1, name:"Арбалет", baseDamage:18, delay:0.7, range:500, projSpeed:9, color:"#b87c4f", emoji:"🏹", knockback:0, projectileEffect: null },
+                { type:2, name:"Посох", baseDamage:42, delay:1.1, range:550, projSpeed:7, color:"#ff8844", emoji:"🔮", knockback:25, projectileEffect: "fire" },
+                { type:3, name:"Кинжал", baseDamage:22, delay:0.35, range:60, projSpeed:0, color:"#cdb", emoji:"🗡️", knockback:30, projectileEffect: null }
             ];
-            let weapon = { ...weaponsLib[0], cd: 0 };
+            let weaponIndex = 0;
+            let weapon = { ...weaponsLib[0], cd: 0, damage: weaponsLib[0].baseDamage };
             
             let enemies = [];
             let projectiles = [];
             let enemyProjectiles = [];
             let particles = [];
-            let items = [];
+            let items = [];      // {x,y,type} type: medkit, speedPotion, armorPotion, ragePotion, powerup_attack, powerup_invincible, magnet
+            let powerups = [];   // активные пауэр-апы
             let walls = [];
             let decor = [];
-            let lights = []; // динамические источники света (эффекты)
+            
+            let wave = 1;
+            let waveTimer = 0;
+            let waveDuration = 30;
+            let waveBonusGiven = false;
             
             let spawnTimer = 0;
             let camera = { x:0, y:0 };
             let moveVec = {x:0, y:0};
             let meleeSwing = { active: false, angle: 0, timer: 0, duration: 0.15, x:0, y:0 };
             
-            function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
+            // Типы врагов (как ранее, добавим сопротивляемость)
+            const enemyTypes = {
+                normal: { hp: 45, speed: 1.3, damage: 12, color: "#4a6e5c", size: 32, exp: 10, name: "Гниль", knockbackResist: 0 },
+                fast:   { hp: 30, speed: 2.2, damage: 10, color: "#c44", size: 32, exp: 12, name: "Шустрый", knockbackResist: 0 },
+                tank:   { hp: 100, speed: 0.8, damage: 15, color: "#48a", size: 38, exp: 20, name: "Танк", knockbackResist: 0.6 },
+                mage:   { hp: 35, speed: 1.0, damage: 18, color: "#a5a", size: 32, exp: 15, name: "Маг", ranged: true, projDamage: 14, projSpeed: 5, knockbackResist: 0 },
+                berserk:{ hp: 55, speed: 1.8, damage: 20, color: "#e74", size: 34, exp: 18, name: "Берсерк", knockbackResist: 0.2 },
+                summoner:{ hp: 40, speed: 0.9, damage: 8, color: "#6a8", size: 36, exp: 25, name: "Призыватель", summonCooldown: 0, knockbackResist: 0.2 },
+                exploder:{ hp: 25, speed: 1.5, damage: 25, color: "#f84", size: 30, exp: 15, name: "Камикадзе", explode: true, knockbackResist: 0 }
+            };
             
-            // --- ВРАГ (расширенный) ---
+            function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+            window.addEventListener('resize', resizeCanvas); resizeCanvas();
+            
+            // --- КЛАСС ВРАГА (с поддержкой эффектов, например горение) ---
             class Enemy {
                 constructor(x, y, typeKey) {
                     const t = enemyTypes[typeKey];
@@ -274,9 +333,18 @@
                     this.explode = t.explode || false;
                     this.knockbackResist = t.knockbackResist || 0;
                     this.hitFlash = 0;
+                    this.burning = 0;   // длительность горения
                 }
                 
                 update(delta) {
+                    if (this.burning > 0) {
+                        this.hp -= 5 * delta;
+                        this.burning -= delta;
+                        if (this.burning > 0) {
+                            for(let i=0;i<2;i++) particles.push({ x: this.x+this.w/2+(Math.random()-0.5)*15, y: this.y+this.h/2+(Math.random()-0.5)*15, life:0.1, vx:0, vy:0, color:"#ff6600" });
+                        }
+                    }
+                    
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -289,17 +357,13 @@
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
                     const distToPlayer = Math.hypot(this.x+this.w/2 - (player.x+PLAYER_W/2), this.y+this.h/2 - (player.y+PLAYER_H/2));
-                    
-                    // Взрывающийся враг: если близко и игрок не в инвизе, взрывается
                     if (this.explode && distToPlayer < 45 && player.invTimer <= 0) {
                         player.hp -= this.damage;
                         player.invTimer = 0.5;
                         for(let i=0;i<20;i++) particles.push({ x: this.x+this.w/2, y: this.y+this.h/2, life:0.5, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, color:"#ff8800" });
-                        this.hp = 0; // убить врага
+                        this.hp = 0;
                         return;
                     }
-                    
-                    // Ближняя атака
                     if (!this.ranged && this.attackTimer <= 0 && distToPlayer < 45) {
                         let finalDamage = this.damage - player.armorBonus;
                         if (finalDamage < 3) finalDamage = 3;
@@ -330,6 +394,11 @@
                     if (this.summonCooldown !== null) this.summonCooldown -= delta;
                     if (this.attackTimer > 0) this.attackTimer -= delta;
                     if (this.hitFlash > 0) this.hitFlash -= delta;
+                    if (this.hp <= 0 && this.explode && !this.hasExploded) {
+                        // взрыв при смерти камикадзе
+                        for(let i=0;i<15;i++) particles.push({ x: this.x+this.w/2, y: this.y+this.h/2, life:0.3, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, color:"#ff8800" });
+                        this.hasExploded = true;
+                    }
                 }
                 
                 draw(cam) {
@@ -339,6 +408,7 @@
                     ctx.beginPath(); ctx.ellipse(x+this.w/2+2, y+this.h-3, this.w/2+4,6,0,0,Math.PI*2); ctx.fill();
                     let drawColor = this.color;
                     if (this.hitFlash > 0) drawColor = "#fff";
+                    if (this.burning > 0) drawColor = "#f84";
                     ctx.fillStyle = drawColor; ctx.fillRect(x, y, this.w, this.h);
                     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x+this.w*0.3, y+this.h*0.4, 4,0,Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(x+this.w*0.7, y+this.h*0.4, 4,0,Math.PI*2); ctx.fill();
@@ -364,80 +434,152 @@
                     }
                     return this.hp <= 0;
                 }
+                
+                setBurning(duration) { this.burning = duration; }
             }
             
-            // --- ПРЕДМЕТЫ ---
+            // --- ПАУЭР-АПЫ ---
+            function addPowerup(type, duration) {
+                const now = Date.now() / 1000;
+                powerups = powerups.filter(p => p.endTime > now);
+                powerups.push({ type, endTime: now + duration });
+                if (type === 'attack_speed') {
+                    // уже учтено в performAttack через глобальный флаг
+                }
+                if (type === 'invincible') {
+                    // invincible: просто даём бафф, который блокирует урон
+                }
+                if (type === 'magnet') {
+                    // магнит притягивает предметы в радиусе
+                }
+                updateBuffIndicator();
+            }
+            
+            function isPowerupActive(type) {
+                const now = Date.now() / 1000;
+                for (let p of powerups) if (p.type === type && p.endTime > now) return true;
+                return false;
+            }
+            
+            function updateBuffIndicator() {
+                const now = Date.now() / 1000;
+                let active = [];
+                for (let p of powerups) if (p.endTime > now) {
+                    if (p.type === 'attack_speed') active.push(`⚡ атака x1.5`);
+                    if (p.type === 'invincible') active.push(`✨ неуязвимость`);
+                    if (p.type === 'magnet') active.push(`🧲 магнит`);
+                }
+                powerups = powerups.filter(p => p.endTime > now);
+                if (active.length) document.getElementById('buffIndicator').innerHTML = '✨ ' + active.join(' | ');
+                else document.getElementById('buffIndicator').innerHTML = '✨ Нет баффов';
+                document.getElementById('speedBuff').innerText = player.speedBonus;
+                document.getElementById('armorBuff').innerText = player.armorBonus;
+            }
+            
+            // --- СИСТЕМА УРОВНЕЙ ---
+            function addExperience(amount) {
+                player.experience += amount;
+                while (player.experience >= player.expToNext) {
+                    player.experience -= player.expToNext;
+                    player.level++;
+                    player.expToNext = Math.floor(player.expToNext * 1.2);
+                    showLevelUpPanel();
+                }
+                document.getElementById('level').innerText = player.level;
+            }
+            
+            function showLevelUpPanel() {
+                if (!gameActive) return;
+                const panel = document.getElementById('levelUpPanel');
+                panel.style.display = 'flex';
+                // пауза игры
+                gameActive = false;
+            }
+            
+            document.getElementById('upgradeDamage').onclick = () => {
+                player.damageBonus += 5;
+                weapon.damage = weaponsLib[weaponIndex].baseDamage + player.damageBonus;
+                document.getElementById('levelUpPanel').style.display = 'none';
+                gameActive = true;
+                updateWeaponDisplay();
+            };
+            document.getElementById('upgradeSpeed').onclick = () => {
+                player.speedBonus = Math.min(player.speedBonus + 10, 60);
+                document.getElementById('levelUpPanel').style.display = 'none';
+                gameActive = true;
+            };
+            document.getElementById('upgradeHealth').onclick = () => {
+                player.maxHp += 15;
+                player.hp += 15;
+                document.getElementById('levelUpPanel').style.display = 'none';
+                gameActive = true;
+            };
+            document.getElementById('upgradeAttackSpeed').onclick = () => {
+                player.attackSpeedBonus += 0.1; // уменьшение задержки на 10%
+                document.getElementById('levelUpPanel').style.display = 'none';
+                gameActive = true;
+            };
+            
+            // --- ВОЛНЫ ---
+            function updateWave(delta) {
+                waveTimer += delta;
+                document.getElementById('waveIndicator').innerHTML = `🌊 Волна ${wave} | ${Math.floor(waveDuration - waveTimer)}с`;
+                if (waveTimer >= waveDuration) {
+                    wave++;
+                    waveTimer = 0;
+                    waveBonusGiven = false;
+                    // Бонус за прохождение волны: исцеление + пауэр-ап
+                    player.hp = Math.min(player.maxHp, player.hp + 20);
+                    addPowerup('attack_speed', 10);
+                    for(let i=0;i<30;i++) particles.push({ x: player.x+PLAYER_W/2, y: player.y+PLAYER_H/2, life:0.5, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, color:"#ffdd88" });
+                    // увеличиваем сложность спавна
+                }
+            }
+            
+            // --- ПРЕДМЕТЫ (добавлены пауэр-апы)---
             function spawnItem(x,y,type) { items.push({ x, y, w: 24, h: 24, type }); }
             
+            function dropRandomItem(x,y) {
+                let r = Math.random();
+                if (r < 0.3) spawnItem(x,y,'medkit');
+                else if (r < 0.5) spawnItem(x,y,'speedPotion');
+                else if (r < 0.65) spawnItem(x,y,'armorPotion');
+                else if (r < 0.8) spawnItem(x,y,'ragePotion');
+                else if (r < 0.9) spawnItem(x,y,'powerup_attack');
+                else spawnItem(x,y,'powerup_magnet');
+            }
+            
+            function applyItemPickup(type) {
+                if (type === 'medkit') player.hp = Math.min(player.maxHp, player.hp + 25);
+                else if (type === 'speedPotion') applyBuff('speed');
+                else if (type === 'armorPotion') applyBuff('armor');
+                else if (type === 'ragePotion') applyBuff('rage');
+                else if (type === 'powerup_attack') addPowerup('attack_speed', 12);
+                else if (type === 'powerup_magnet') addPowerup('magnet', 10);
+            }
+            
+            let buffs = [];
             function applyBuff(type) {
                 const now = Date.now() / 1000;
                 if (type === 'speed') {
                     player.speedBonus = Math.min(player.speedBonus + 20, 60);
                     buffs.push({ type: 'speed', endTime: now + 10, value: 20 });
-                    document.getElementById('speedBuff').innerText = player.speedBonus;
                 } else if (type === 'armor') {
                     player.armorBonus = Math.min(player.armorBonus + 10, 30);
                     buffs.push({ type: 'armor', endTime: now + 12, value: 10 });
-                    document.getElementById('armorBuff').innerText = player.armorBonus;
-                } else if (type === 'heal') {
-                    player.hp = Math.min(player.maxHp, player.hp + 25);
                 } else if (type === 'rage') {
                     buffs.push({ type: 'damage', endTime: now + 8, value: 1.5 });
                 }
                 updateBuffIndicator();
             }
             
-            let buffs = [];
-            function updateBuffIndicator() {
-                const now = Date.now() / 1000;
-                let active = [];
-                for (let b of buffs) {
-                    if (b.endTime > now) {
-                        if (b.type === 'speed') active.push(`⚡+${b.value}% скор.`);
-                        if (b.type === 'armor') active.push(`🛡️+${b.value} броня`);
-                        if (b.type === 'damage') active.push(`💢 x1.5 урон`);
-                    }
-                }
-                buffs = buffs.filter(b => b.endTime > now);
-                if (active.length) document.getElementById('buffIndicator').innerHTML = '✨ ' + active.join(' | ');
-                else document.getElementById('buffIndicator').innerHTML = '✨ Нет активных баффов';
-                document.getElementById('speedBuff').innerText = player.speedBonus;
-                document.getElementById('armorBuff').innerText = player.armorBonus;
-            }
-            
-            // --- КОМБО ---
-            function updateCombo() {
-                const now = Date.now() / 1000;
-                if (now - player.lastKillTime < 3) {
-                    player.combo++;
-                    player.comboTime = now + 3;
-                } else {
-                    player.combo = 1;
-                    player.comboTime = now + 3;
-                }
-                player.lastKillTime = now;
-                document.getElementById('comboCounter').innerHTML = `🔥 ${player.combo} комбо`;
-                if (player.combo >= 10) {
-                    // бонус: ускорение атаки на 20% временно
-                    if (!window.comboBonusActive) {
-                        window.comboBonusActive = true;
-                        setTimeout(() => { window.comboBonusActive = false; }, 5000);
-                    }
-                }
-            }
-            
-            function resetCombo() {
-                const now = Date.now() / 1000;
-                if (player.comboTime < now) {
-                    player.combo = 0;
-                    document.getElementById('comboCounter').innerHTML = `🔥 0 комбо`;
-                }
-            }
-            
-            // --- СПАВН ---
+            // --- СПАВН ВРАГОВ (зависит от волны)---
             function spawnRandomEnemy() {
                 const types = ['normal', 'fast', 'tank', 'mage', 'berserk', 'summoner', 'exploder'];
-                const weights = [35, 25, 15, 10, 8, 4, 3];
+                let weights = [35, 25, 15, 10, 8, 4, 3];
+                // увеличение сложности с волной
+                if (wave >= 3) weights[4] += 5; // больше берсерков
+                if (wave >= 5) weights[6] += 5; // больше камикадзе
                 let r = Math.random() * 100;
                 let cum = 0, selected = 'normal';
                 for (let i=0; i<types.length; i++) {
@@ -450,14 +592,6 @@
                 y = Math.min(Math.max(y, 80), WORLD_H-80);
                 if(Math.hypot(x-player.x, y-player.y) < 250) return;
                 enemies.push(new Enemy(x,y,selected));
-            }
-            
-            function dropRandomItem(x,y) {
-                let r = Math.random();
-                if (r < 0.4) spawnItem(x,y,'medkit');
-                else if (r < 0.6) spawnItem(x,y,'speedPotion');
-                else if (r < 0.75) spawnItem(x,y,'armorPotion');
-                else if (r < 0.9) spawnItem(x,y,'ragePotion');
             }
             
             function scatterStartingItems(){
@@ -476,7 +610,7 @@
             wallData.forEach(w => addWall(w[0],w[1],w[2],w[3]));
             for(let i=0;i<180;i++) decor.push({ x:Math.random()*WORLD_W, y:Math.random()*WORLD_H });
             
-            // --- УПРАВЛЕНИЕ ---
+            // --- УПРАВЛЕНИЕ NIPPLEJS ---
             if (typeof nipplejs !== 'undefined') {
                 nipplejs.create({ zone: document.getElementById('moveArea'), mode: 'static', size: 120, color: '#d4c29b', restOpacity: 0.7, shape: 'circle' })
                     .on('move', (evt, nipple) => { const v = nipple.vector; moveVec.x = v.x; moveVec.y = -v.y; })
@@ -492,16 +626,24 @@
                 if(weapon.cd<=0) performAttack({x:dx, y:dy});
             });
             
-            // --- АТАКА (всегда с анимацией) ---
+            function updateWeaponDisplay() {
+                document.getElementById('weaponInfo').innerHTML = `${weapon.emoji} ${weapon.name} (${weapon.damage})`;
+            }
+            
+            // --- АТАКА (с учётом пауэр-апов)---
             function performAttack(dir) {
                 if (weapon.cd > 0) return;
                 let damageMulti = 1;
                 const now = Date.now() / 1000;
                 for (let b of buffs) if (b.type === 'damage' && b.endTime > now) damageMulti = b.value;
+                let attackSpeedMulti = 1;
+                if (isPowerupActive('attack_speed')) attackSpeedMulti = 0.66;
+                let finalDelay = weapon.delay * (1 - player.attackSpeedBonus*0.1) * attackSpeedMulti;
+                if (finalDelay < 0.2) finalDelay = 0.2;
                 let isCrit = Math.random() < 0.2;
-                let finalDamage = Math.floor(weapon.damage * damageMulti * (isCrit ? 2 : 1));
+                let finalDamage = Math.floor((weapon.damage + player.damageBonus) * damageMulti * (isCrit ? 2 : 1));
                 
-                // Анимация взмаха ВСЕГДА (даже если никого не задел)
+                // Анимация взмаха
                 meleeSwing.active = true;
                 meleeSwing.timer = meleeSwing.duration;
                 meleeSwing.angle = Math.atan2(dir.y, dir.x);
@@ -528,46 +670,74 @@
                                 enemies.splice(i,1);
                                 player.kills++;
                                 document.getElementById('kills').innerText = player.kills;
+                                addExperience(e.exp);
                                 updateCombo();
                                 if (Math.random() < 0.35) dropRandomItem(ex, ey);
-                                // взрывные партиклы
                                 for(let p=0;p<20;p++) particles.push({ x: ex, y: ey, life:0.4, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, color: isCrit ? "#ffaa44" : "#ff8844" });
                                 i--;
                             } else {
-                                // отлетание врагов (уже внутри takeDamage)
                                 for(let p=0;p<8;p++) particles.push({ x: ex, y: ey, life:0.2, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4, color:"#f88" });
                             }
                         }
                     }
                 } else { // Ranged
+                    let projEffect = weapon.projectileEffect;
                     projectiles.push({
                         x: player.x+PLAYER_W/2, y: player.y+PLAYER_H/2,
                         vx: dir.x * weapon.projSpeed, vy: dir.y * weapon.projSpeed,
                         damage: finalDamage, traveled: 0, range: weapon.range,
-                        size: 8, color: weapon.color, crit: isCrit
+                        size: 8, color: weapon.color, crit: isCrit, effect: projEffect
                     });
                 }
-                weapon.cd = weapon.delay;
-                if (window.comboBonusActive) weapon.cd *= 0.8; // ускорение атаки от комбо
+                weapon.cd = finalDelay;
+                if (window.comboBonusActive) weapon.cd *= 0.8;
             }
             
-            // --- ПОДБОР ПРЕДМЕТОВ ---
+            // --- КОМБО ---
+            let combo = 0, comboTime = 0, lastKillTime = 0;
+            function updateCombo() {
+                const now = Date.now() / 1000;
+                if (now - lastKillTime < 3) combo++;
+                else combo = 1;
+                lastKillTime = now;
+                comboTime = now + 3;
+                document.getElementById('comboCounter').innerHTML = `🔥 ${combo} комбо`;
+                if (combo >= 10 && !window.comboBonusActive) {
+                    window.comboBonusActive = true;
+                    setTimeout(() => { window.comboBonusActive = false; }, 5000);
+                }
+            }
+            function resetCombo() {
+                if (Date.now()/1000 > comboTime) {
+                    combo = 0;
+                    document.getElementById('comboCounter').innerHTML = `🔥 0 комбо`;
+                }
+            }
+            
+            // --- ПОДБОР ПРЕДМЕТОВ С МАГНИТОМ ---
             function checkPickup() {
+                let magnetRange = isPowerupActive('magnet') ? 200 : 30;
                 for (let i=0; i<items.length; i++) {
                     let it = items[i];
-                    if (Math.abs(player.x+PLAYER_W/2 - (it.x+it.w/2)) < 28 && Math.abs(player.y+PLAYER_H/2 - (it.y+it.h/2)) < 28) {
-                        if (it.type === 'medkit') applyBuff('heal');
-                        else if (it.type === 'speedPotion') applyBuff('speed');
-                        else if (it.type === 'armorPotion') applyBuff('armor');
-                        else if (it.type === 'ragePotion') applyBuff('rage');
-                        items.splice(i,1);
-                        for(let p=0;p<15;p++) particles.push({ x:it.x+it.w/2, y:it.y+it.h/2, life:0.3, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, color:"#ffd700" });
-                        i--;
+                    let dist = Math.hypot(player.x+PLAYER_W/2 - (it.x+it.w/2), player.y+PLAYER_H/2 - (it.y+it.h/2));
+                    if (dist < magnetRange) {
+                        if (dist < 28) {
+                            applyItemPickup(it.type);
+                            items.splice(i,1);
+                            for(let p=0;p<15;p++) particles.push({ x:it.x+it.w/2, y:it.y+it.h/2, life:0.3, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, color:"#ffd700" });
+                            i--;
+                        } else if (isPowerupActive('magnet')) {
+                            // подтягиваем предмет к игроку
+                            let angle = Math.atan2(player.y+PLAYER_H/2 - (it.y+it.h/2), player.x+PLAYER_W/2 - (it.x+it.w/2));
+                            let speed = 8;
+                            it.x += Math.cos(angle) * speed;
+                            it.y += Math.sin(angle) * speed;
+                        }
                     }
                 }
             }
             
-            // --- ДВИЖЕНИЕ ---
+            // --- ДВИЖЕНИЕ И СТОЛКНОВЕНИЯ ---
             let keyState = { w:false,s:false,a:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false };
             window.addEventListener('keydown', (e)=>{ if(keyState.hasOwnProperty(e.key)) { keyState[e.key]=true; e.preventDefault(); } if(e.key===' '||e.key==='Space') { e.preventDefault(); if(weapon.cd<=0) performAttack({x:player.dirX||1, y:player.dirY||0}); } });
             window.addEventListener('keyup', (e)=>{ if(keyState.hasOwnProperty(e.key)) keyState[e.key]=false; });
@@ -610,7 +780,7 @@
                 }
             }
             
-            // --- СНАРЯДЫ ---
+            // --- СНАРЯДЫ С ЭФФЕКТАМИ ---
             function updateProjectiles(delta) {
                 for (let i=0;i<projectiles.length;i++) {
                     let p = projectiles[i];
@@ -623,9 +793,10 @@
                         let e=enemies[j];
                         if(p.x>e.x && p.x<e.x+e.w && p.y>e.y && p.y<e.y+e.h){
                             let dead = e.takeDamage(p.damage, null, 0);
+                            if (p.effect === 'fire') e.setBurning(3);
                             projectiles.splice(i,1);
                             for(let pt=0;pt<8;pt++) particles.push({ x:p.x, y:p.y, life:0.2, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, color:p.crit ? "#ffdd44" : "#ffa" });
-                            if(dead) { enemies.splice(j,1); player.kills++; document.getElementById('kills').innerText=player.kills; updateCombo(); if(Math.random()<0.35) dropRandomItem(e.x+e.w/2, e.y+e.h/2); j--; }
+                            if(dead) { enemies.splice(j,1); player.kills++; document.getElementById('kills').innerText=player.kills; addExperience(e.exp); updateCombo(); if(Math.random()<0.35) dropRandomItem(e.x+e.w/2, e.y+e.h/2); j--; }
                             break;
                         }
                     }
@@ -635,9 +806,11 @@
                     p.x += p.vx; p.y += p.vy;
                     if (p.x<0 || p.x>WORLD_W || p.y<0 || p.y>WORLD_H) { enemyProjectiles.splice(i,1); i--; continue; }
                     if (Math.hypot(p.x - (player.x+PLAYER_W/2), p.y - (player.y+PLAYER_H/2)) < 25) {
-                        let finalDamage = p.damage - player.armorBonus;
-                        if (finalDamage < 2) finalDamage = 2;
-                        player.hp -= finalDamage;
+                        if (!isPowerupActive('invincible')) {
+                            let finalDamage = p.damage - player.armorBonus;
+                            if (finalDamage < 2) finalDamage = 2;
+                            player.hp -= finalDamage;
+                        }
                         player.invTimer = 0.5;
                         enemyProjectiles.splice(i,1);
                         for(let pt=0;pt<8;pt++) particles.push({ x:p.x, y:p.y, life:0.2, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, color:"#f44" });
@@ -648,7 +821,9 @@
             
             // --- ОБНОВЛЕНИЯ ---
             function updateCooldowns(delta) {
-                if (weapon.cd > 0) { weapon.cd -= delta; let fill = 1 - weapon.cd/weapon.delay; document.getElementById('reloadFill').style.width = (fill*100)+'%'; }
+                let maxDelay = weapon.delay * (1 - player.attackSpeedBonus*0.1);
+                if (isPowerupActive('attack_speed')) maxDelay *= 0.66;
+                if (weapon.cd > 0) { weapon.cd -= delta; let fill = 1 - weapon.cd/maxDelay; document.getElementById('reloadFill').style.width = (fill*100)+'%'; }
                 else document.getElementById('reloadFill').style.width = '100%';
                 if (meleeSwing.active) { meleeSwing.timer -= delta; if(meleeSwing.timer<=0) meleeSwing.active=false; }
                 if (player.invTimer > 0) player.invTimer -= delta;
@@ -665,10 +840,11 @@
             
             function updateSpawning(delta) {
                 spawnTimer += delta;
-                if (spawnTimer > 3.2 && enemies.length < 18) {
+                let maxEnemies = 10 + Math.floor(wave/2);
+                if (spawnTimer > (wave > 5 ? 2.5 : 3.5) && enemies.length < maxEnemies) {
                     spawnTimer = 0;
                     spawnRandomEnemy();
-                    if (enemies.length < 9 && Math.random()<0.4) spawnRandomEnemy();
+                    if (enemies.length < maxEnemies-3 && Math.random()<0.4) spawnRandomEnemy();
                 }
             }
             
@@ -679,20 +855,53 @@
                 camera.y = Math.min(Math.max(0, ty), WORLD_H - canvas.height);
             }
             
-            // --- КРАСОЧНАЯ ОТРИСОВКА С ДИНАМИЧЕСКИМ СВЕТОМ ---
-            function drawLighting() {
-                // Эффект свечения вокруг игрока
-                let cx = player.x + PLAYER_W/2 - camera.x;
-                let cy = player.y + PLAYER_H/2 - camera.y;
-                let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 130);
-                grad.addColorStop(0, 'rgba(255,240,180,0.25)');
-                grad.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.globalCompositeOperation = 'source-over';
+            // --- МИНИ-КАРТА ---
+            function drawMinimap() {
+                const mapSize = 120;
+                const mapX = canvas.width - mapSize - 10;
+                const mapY = 10;
+                ctx.globalAlpha = 0.7;
+                ctx.fillStyle = "#000000aa";
+                ctx.fillRect(mapX, mapY, mapSize, mapSize);
+                ctx.strokeStyle = "#fff";
+                ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+                // масштаб
+                let scaleX = mapSize / WORLD_W;
+                let scaleY = mapSize / WORLD_H;
+                // игрок
+                ctx.fillStyle = "#0f0";
+                ctx.beginPath();
+                ctx.arc(mapX + player.x * scaleX, mapY + player.y * scaleY, 3, 0, Math.PI*2);
+                ctx.fill();
+                // враги
+                for (let e of enemies) {
+                    ctx.fillStyle = "#f00";
+                    ctx.beginPath();
+                    ctx.arc(mapX + e.x * scaleX, mapY + e.y * scaleY, 2, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                // предметы
+                for (let it of items) {
+                    ctx.fillStyle = "#ff0";
+                    ctx.beginPath();
+                    ctx.arc(mapX + it.x * scaleX, mapY + it.y * scaleY, 2, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
             }
             
+            // --- ОТРИСОВКА МИРА ---
+            function drawGround() {
+                let grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
+                grad.addColorStop(0, '#5d9652'); grad.addColorStop(1, '#2b522c');
+                ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+                for(let i=0;i<600;i++) {
+                    let wx = (i*311)%WORLD_W, wy = (i*457)%WORLD_H, sx = wx-camera.x, sy = wy-camera.y;
+                    if(sx>0 && sx<canvas.width && sy>0 && sy<canvas.height){ ctx.fillStyle = 'rgba(210,240,120,0.25)'; ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill(); }
+                }
+            }
+            function drawWalls() { for(let w of walls){ let x=w.x-camera.x, y=w.y-camera.y; if(x+w.w<0||x>canvas.width||y+w.h<0||y>canvas.height) continue; ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x+w.w/2+2,y+w.h-3,w.w/2+4,8,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#5f5035'; ctx.fillRect(x,y+22,w.w,w.h); ctx.fillStyle='#b39d6b'; ctx.beginPath(); ctx.moveTo(x,y+22); ctx.lineTo(x+w.w,y+22); ctx.lineTo(x+w.w-5,y); ctx.lineTo(x+5,y); ctx.fill(); ctx.fillStyle='#473d28'; ctx.fillRect(x+w.w-6,y+20,6,w.h); } }
+            function drawDecor() { for(let d of decor){ let x=d.x-camera.x, y=d.y-camera.y; if(x>-50&&x<canvas.width+50&&y>-50&&y<canvas.height+50) { ctx.fillStyle='#4c7a3a'; ctx.beginPath(); ctx.ellipse(x,y-4,10,7,0,0,Math.PI*2); ctx.fill(); } } }
             function drawItems() {
                 for(let it of items){
                     let x=it.x-camera.x, y=it.y-camera.y;
@@ -705,26 +914,14 @@
                     else if (it.type === 'speedPotion') icon = '⚡';
                     else if (it.type === 'armorPotion') icon = '🛡️';
                     else if (it.type === 'ragePotion') icon = '💢';
+                    else if (it.type === 'powerup_attack') icon = '⚔️';
+                    else if (it.type === 'powerup_magnet') icon = '🧲';
                     ctx.fillText(icon, x+5, y+18);
-                    // блеск
                     ctx.globalAlpha = 0.5 + Math.sin(Date.now()/200)*0.3;
                     ctx.fillStyle = '#ffdd99'; ctx.fillRect(x+2, y+2, 6, 6);
                     ctx.globalAlpha = 1;
                 }
             }
-            
-            function drawGround() {
-                let grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
-                grad.addColorStop(0, '#5d9652'); grad.addColorStop(1, '#2b522c');
-                ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
-                for(let i=0;i<600;i++) {
-                    let wx = (i*311)%WORLD_W, wy = (i*457)%WORLD_H, sx = wx-camera.x, sy = wy-camera.y;
-                    if(sx>0 && sx<canvas.width && sy>0 && sy<canvas.height){ ctx.fillStyle = 'rgba(210,240,120,0.25)'; ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill(); }
-                }
-            }
-            function drawWalls() { for(let w of walls){ let x=w.x-camera.x, y=w.y-camera.y; if(x+w.w<0||x>canvas.width||y+w.h<0||y>canvas.height) continue; ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x+w.w/2+2,y+w.h-3,w.w/2+4,8,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#5f5035'; ctx.fillRect(x,y+22,w.w,w.h); ctx.fillStyle='#b39d6b'; ctx.beginPath(); ctx.moveTo(x,y+22); ctx.lineTo(x+w.w,y+22); ctx.lineTo(x+w.w-5,y); ctx.lineTo(x+5,y); ctx.fill(); ctx.fillStyle='#473d28'; ctx.fillRect(x+w.w-6,y+20,6,w.h); } }
-            function drawDecor() { for(let d of decor){ let x=d.x-camera.x, y=d.y-camera.y; if(x>-50&&x<canvas.width+50&&y>-50&&y<canvas.height+50) { ctx.fillStyle='#4c7a3a'; ctx.beginPath(); ctx.ellipse(x,y-4,10,7,0,0,Math.PI*2); ctx.fill(); } } }
-            
             function drawPlayer() {
                 let px=player.x-camera.x, py=player.y-camera.y, cx=px+PLAYER_W/2, cy=py+PLAYER_H/2;
                 ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(cx+3,cy+6,20,10,0,0,Math.PI*2); ctx.fill();
@@ -743,6 +940,17 @@
             function drawProjectiles() { for(let p of projectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.crit ? "#ffdd66" : p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size,0,Math.PI*2); ctx.fill(); if(p.crit) { ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(sx,sy,p.size-2,0,Math.PI*2); ctx.fill(); } } }
             function drawEnemyProjectiles() { for(let p of enemyProjectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,6,0,Math.PI*2); ctx.fill(); } }
             function drawParticles(){ for(let p of particles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill(); } }
+            function drawLighting() {
+                let cx = player.x + PLAYER_W/2 - camera.x;
+                let cy = player.y + PLAYER_H/2 - camera.y;
+                let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 150);
+                grad.addColorStop(0, 'rgba(255,240,180,0.2)');
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.globalCompositeOperation = 'source-over';
+            }
             
             function showDeath() {
                 if(!gameActive) return;
@@ -752,7 +960,7 @@
                 document.body.appendChild(div); document.getElementById('restart').onclick = () => location.reload();
             }
             
-            // --- ЦИКЛ ---
+            // --- ОСНОВНОЙ ЦИКЛ ---
             function gameLoop(now) {
                 if (!gameActive) { requestAnimationFrame(gameLoop); return; }
                 let delta = Math.min(0.033, (now - lastTimestamp) / 1000);
@@ -763,6 +971,7 @@
                     movePlayer();
                     checkPickup();
                     updateSpawning(delta);
+                    updateWave(delta);
                     if (player.hp <= 0) showDeath();
                 }
                 lastTimestamp = now;
@@ -773,15 +982,24 @@
                 drawProjectiles();
                 drawPlayer();
                 drawParticles();
-                drawLighting(); // добавляем свечение
+                drawLighting();
+                drawMinimap();
                 ctx.globalAlpha = 1;
                 ctx.fillStyle = '#c0e0a020'; ctx.fillRect(0,0,canvas.width,canvas.height);
                 requestAnimationFrame(gameLoop);
             }
             
-            // --- ЗАПУСК ---
-            scatterStartingItems();
-            for(let i=0;i<6;i++) spawnRandomEnemy();
+            // --- ИНИЦИАЛИЗАЦИЯ ---
+            function init() {
+                scatterStartingItems();
+                for(let i=0;i<6;i++) spawnRandomEnemy();
+                waveTimer = 0;
+                wave = 1;
+                document.getElementById('waveIndicator').innerHTML = `🌊 Волна 1`;
+                updateWeaponDisplay();
+            }
+            
+            init();
             lastTimestamp = performance.now();
             gameLoop(lastTimestamp);
         })();
