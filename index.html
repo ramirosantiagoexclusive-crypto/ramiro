@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure: Fixed Controls</title>
+    <title>2.5D Adventure - Mobile Ready</title>
     <style>
         * {
             margin: 0;
@@ -470,30 +470,35 @@
             // ---------- УПРАВЛЕНИЕ АТАКОЙ (ПРАВАЯ ЗОНА) ----------
             let aiming = false;
             let aimDir = { x:1, y:0 };
-            let aimStart = { x:0, y:0 };
             const attackDiv = document.getElementById('attackZone');
             const aimDot = document.getElementById('aimDot');
 
-            // Функция: направление от игрока к точке на экране
-            function getDirFromPlayerToScreenPoint(clientX, clientY) {
-                // Получаем экранные координаты центра игрока
-                const playerScreenX = player.x - camera.x + PLAYER_W/2;
-                const playerScreenY = player.y - camera.y + PLAYER_H/2;
-                let dx = clientX - playerScreenX;
-                let dy = clientY - playerScreenY;
+            function getPlayerScreenCenter() {
+                return {
+                    x: player.x - camera.x + PLAYER_W/2,
+                    y: player.y - camera.y + PLAYER_H/2
+                };
+            }
+
+            function updateAimDirectionFromTouch(clientX, clientY) {
+                const playerScreen = getPlayerScreenCenter();
+                let dx = clientX - playerScreen.x;
+                let dy = clientY - playerScreen.y;
                 let len = Math.hypot(dx, dy);
-                if (len < 0.001) return { x:1, y:0 };
-                return { x: dx/len, y: dy/len };
+                if (len > 0.001) {
+                    aimDir.x = dx / len;
+                    aimDir.y = dy / len;
+                } else {
+                    aimDir.x = 1; aimDir.y = 0;
+                }
             }
 
             function onAimStart(e) {
                 e.preventDefault();
                 const touch = e.touches ? e.touches[0] : e;
                 aiming = true;
-                aimStart.x = touch.clientX;
-                aimStart.y = touch.clientY;
-                // Прицел сразу направлен от игрока к точке касания (не зависит от движения)
-                aimDir = getDirFromPlayerToScreenPoint(touch.clientX, touch.clientY);
+                // сразу устанавливаем направление от игрока к точке касания
+                updateAimDirectionFromTouch(touch.clientX, touch.clientY);
                 aimDot.style.display = 'block';
                 aimDot.style.left = touch.clientX + 'px';
                 aimDot.style.top = touch.clientY + 'px';
@@ -503,14 +508,8 @@
                 if (!aiming) return;
                 e.preventDefault();
                 const touch = e.touches ? e.touches[0] : e;
-                // Обновляем направление прицела по движению пальца относительно начальной точки
-                let dx = touch.clientX - aimStart.x;
-                let dy = touch.clientY - aimStart.y;
-                let len = Math.hypot(dx, dy);
-                if (len > 8) {
-                    aimDir.x = dx / len;
-                    aimDir.y = dy / len;
-                } // иначе оставляем текущее направление
+                // обновляем направление прицела по движению пальца
+                updateAimDirectionFromTouch(touch.clientX, touch.clientY);
                 aimDot.style.left = touch.clientX + 'px';
                 aimDot.style.top = touch.clientY + 'px';
             }
@@ -531,12 +530,11 @@
             attackDiv.addEventListener('mousedown', onAimStart);
             attackDiv.addEventListener('mousemove', (e) => { if (aiming) onAimMove(e); });
             attackDiv.addEventListener('mouseup', onAimEnd);
-
-            // Быстрая атака кликом на ПК
+            // для ПК быстрый клик
             attackDiv.addEventListener('click', (e) => {
                 if (window.innerWidth > 768 && weapon.cd <= 0) {
-                    let dir = getDirFromPlayerToScreenPoint(e.clientX, e.clientY);
-                    performAttack(dir);
+                    updateAimDirectionFromTouch(e.clientX, e.clientY);
+                    performAttack(aimDir);
                 }
             });
 
