@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение</title>
+    <title>2.5D Приключение: Оружие и битвы</title>
     <style>
         * {
             margin: 0;
@@ -16,7 +16,7 @@
         body {
             background: #0a2a22;
             overflow: hidden;
-            touch-action: none; /* отключаем жесты браузера */
+            touch-action: none;
             font-family: system-ui, 'Segoe UI', monospace;
         }
 
@@ -27,12 +27,12 @@
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover; /* сохраняет пропорции, но заполняет экран */
+            object-fit: cover;
             cursor: crosshair;
             touch-action: none;
         }
 
-        /* Стили джойстика (только для сенсорных экранов) */
+        /* Джойстик (движение) */
         .joystick-container {
             position: fixed;
             bottom: 40px;
@@ -70,14 +70,98 @@
             touch-action: none;
             cursor: grab;
         }
+
+        /* Кнопка огня */
+        .fire-button {
+            position: fixed;
+            bottom: 40px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            background: rgba(180, 60, 40, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 4px black;
+            box-shadow: 0 0 0 3px #ffcc88, 0 6px 15px black;
+            cursor: pointer;
+            touch-action: manipulation;
+            z-index: 100;
+            transition: 0.05s linear;
+        }
+        .fire-button:active {
+            transform: scale(0.94);
+            background: rgba(220, 80, 50, 0.95);
+        }
+
         @media (max-width: 768px) {
             .joystick-container { width: 120px; height: 120px; bottom: 25px; left: 20px; }
             .joystick-base { width: 95px; height: 95px; }
             .joystick-thumb { width: 47px; height: 47px; top: 24px; left: 24px; }
+            .fire-button { width: 70px; height: 70px; bottom: 25px; right: 20px; font-size: 1.8rem; }
         }
-        @media (hover: hover) {
-            /* на десктопе джойстик не мешает, но он остаётся, можно по желанию */
-            .joystick-container { display: flex; }
+
+        /* Полоска здоровья и интерфейс */
+        .ui {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            padding: 8px 15px;
+            border-radius: 40px;
+            color: #ffefc0;
+            font-weight: bold;
+            font-size: 1rem;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .weapon-info {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            padding: 8px 15px;
+            border-radius: 40px;
+            color: #ffd966;
+            font-weight: bold;
+            font-size: 0.9rem;
+            font-family: monospace;
+            text-align: right;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .reload-indicator {
+            position: fixed;
+            bottom: 140px;
+            right: 30px;
+            width: 60px;
+            height: 6px;
+            background: #444;
+            border-radius: 4px;
+            overflow: hidden;
+            z-index: 100;
+        }
+        .reload-fill {
+            height: 100%;
+            width: 0%;
+            background: #ffaa44;
+            transition: width 0.05s linear;
+        }
+        @media (max-width: 768px) {
+            .reload-indicator { bottom: 115px; right: 25px; width: 50px; }
+            .ui { font-size: 0.8rem; top: 8px; left: 8px; }
+            .weapon-info { font-size: 0.75rem; top: 8px; right: 8px; }
         }
     </style>
 </head>
@@ -88,20 +172,29 @@
             <div class="joystick-thumb" id="joystickThumb"></div>
         </div>
     </div>
+    <div class="fire-button" id="fireButton">⚔️</div>
+    <div class="ui" id="ui">
+        ❤️ <span id="hpValue">100</span> &nbsp;| 🧟‍♂️ <span id="kills">0</span>
+    </div>
+    <div class="weapon-info" id="weaponInfo">
+        🗡️ Меч (урон 25)
+    </div>
+    <div class="reload-indicator" id="reloadIndicator">
+        <div class="reload-fill" id="reloadFill"></div>
+    </div>
 
     <script>
         (function(){
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
             
-            // Размеры мира (остаются неизменными)
+            // Размеры мира
             const WORLD_WIDTH = 2800;
             const WORLD_HEIGHT = 2200;
             const PLAYER_W = 38;
             const PLAYER_H = 38;
             const MOVE_SPEED = 5.4;
             
-            // Динамические размеры canvas (весь экран)
             let CANVAS_W = window.innerWidth;
             let CANVAS_H = window.innerHeight;
             
@@ -113,19 +206,148 @@
             }
             window.addEventListener('resize', () => {
                 resizeCanvas();
-                updateCamera(); // сразу подстроить камеру
+                updateCamera();
             });
             resizeCanvas();
             
+            // ---------- ИГРОК ----------
             let player = {
                 x: WORLD_WIDTH / 2,
                 y: WORLD_HEIGHT / 2,
                 dirX: 0,
                 dirY: 1,
-                animTime: 0
+                animTime: 0,
+                hp: 100,
+                maxHp: 100,
+                invincibleTimer: 0,
+                kills: 0
             };
             
-            // ----- СТЕНЫ (полный набор) -----
+            // ---------- ОРУЖИЕ ----------
+            const WeaponType = {
+                MELEE: 0,
+                RANGED: 1,
+                MAGIC: 2
+            };
+            
+            let currentWeapon = {
+                type: WeaponType.MELEE,
+                name: "Меч",
+                damage: 25,
+                attackCooldown: 0, // оставшееся время задержки
+                attackDelay: 0.6,   // секунд между атаками
+                projectileSpeed: 0,
+                range: 70,          // для ближнего боя дистанция
+                ammo: null,
+                color: "#c0a16b"
+            };
+            
+            // Предопределённое оружие
+            const weaponsList = [
+                { type: WeaponType.MELEE, name: "Меч", damage: 28, attackDelay: 0.5, range: 75, color: "#c0a16b", projectileSpeed: 0, emoji: "🗡️" },
+                { type: WeaponType.RANGED, name: "Арбалет", damage: 18, attackDelay: 0.9, range: 400, projectileSpeed: 9, color: "#b87c4f", emoji: "🏹" },
+                { type: WeaponType.MAGIC, name: "Посох огня", damage: 42, attackDelay: 1.2, range: 500, projectileSpeed: 7, color: "#aa66ff", emoji: "🔮" }
+            ];
+            
+            // Снаряды
+            let projectiles = [];
+            
+            // ---------- ВРАГИ ----------
+            let enemies = [];
+            class Enemy {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                    this.w = 34;
+                    this.h = 34;
+                    this.hp = 45;
+                    this.maxHp = 45;
+                    this.speed = 1.4;
+                    this.attackTimer = 0;
+                }
+                update() {
+                    // движение к игроку
+                    let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
+                    let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
+                    let len = Math.hypot(dx, dy);
+                    if(len > 0.1) {
+                        dx /= len;
+                        dy /= len;
+                        this.x += dx * this.speed;
+                        this.y += dy * this.speed;
+                    }
+                    // столкновение с миром (ограничения)
+                    this.x = Math.min(Math.max(this.x, 0), WORLD_WIDTH - this.w);
+                    this.y = Math.min(Math.max(this.y, 0), WORLD_HEIGHT - this.h);
+                    // атака на игрока
+                    if(this.attackTimer <= 0 && Math.hypot(this.x + this.w/2 - (player.x + PLAYER_W/2), this.y + this.h/2 - (player.y + PLAYER_H/2)) < 40) {
+                        player.hp -= 12;
+                        player.invincibleTimer = 0.7;
+                        this.attackTimer = 0.8;
+                    }
+                    if(this.attackTimer > 0) this.attackTimer -= 1/60;
+                }
+                draw(ctx, camera) {
+                    let x = this.x - camera.x;
+                    let y = this.y - camera.y;
+                    if(x + this.w < 0 || x > CANVAS_W || y + this.h < 0 || y > CANVAS_H) return;
+                    // тень
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                    ctx.beginPath();
+                    ctx.ellipse(x+this.w/2+3, y+this.h-4, this.w/2+4, 8, 0, 0, Math.PI*2);
+                    ctx.fill();
+                    // тело
+                    ctx.fillStyle = '#4a6e5c';
+                    ctx.fillRect(x, y, this.w, this.h);
+                    ctx.fillStyle = '#2f5442';
+                    ctx.fillRect(x+5, y-5, this.w-10, 8);
+                    // глаза
+                    ctx.fillStyle = '#ffaaaa';
+                    ctx.beginPath();
+                    ctx.arc(x+this.w*0.3, y+this.h*0.4, 4, 0, Math.PI*2);
+                    ctx.arc(x+this.w*0.7, y+this.h*0.4, 4, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(x+this.w*0.3-1, y+this.h*0.4-1, 1.5, 0, Math.PI*2);
+                    ctx.arc(x+this.w*0.7-1, y+this.h*0.4-1, 1.5, 0, Math.PI*2);
+                    ctx.fill();
+                    // полоска здоровья
+                    let hpPercent = this.hp / this.maxHp;
+                    ctx.fillStyle = '#900';
+                    ctx.fillRect(x, y-8, this.w, 5);
+                    ctx.fillStyle = '#0a0';
+                    ctx.fillRect(x, y-8, this.w * hpPercent, 5);
+                }
+            }
+            
+            // ---------- ПРЕДМЕТЫ ОРУЖИЯ НА КАРТЕ ----------
+            let weaponItems = [];
+            function spawnWeaponItem(x, y, weaponIndex) {
+                weaponItems.push({ x, y, w: 28, h: 28, weaponIdx: weaponIndex });
+            }
+            // разбросать оружие
+            function scatterWeapons() {
+                for(let i=0; i<weaponsList.length; i++) {
+                    let placed = false;
+                    for(let attempt=0; attempt<20; attempt++) {
+                        let x = 200 + Math.random() * (WORLD_WIDTH - 400);
+                        let y = 200 + Math.random() * (WORLD_HEIGHT - 400);
+                        let ok = true;
+                        for(let w of walls) {
+                            if(x < w.x+w.w+30 && x+30 > w.x && y < w.y+w.h+30 && y+30 > w.y) ok=false;
+                        }
+                        if(ok && Math.hypot(x - player.x, y - player.y) > 200) {
+                            spawnWeaponItem(x, y, i);
+                            placed=true;
+                            break;
+                        }
+                    }
+                    if(!placed) spawnWeaponItem(500 + i*300, 500 + i*200, i);
+                }
+            }
+            
+            // ---------- СТЕНЫ (как ранее) ----------
             let walls = [];
             function addWall(x,y,w,h){ walls.push({x,y,w,h}); }
             function initWalls() {
@@ -144,13 +366,28 @@
             }
             initWalls();
             
-            // Декорации (кусты/камни)
+            // декорации (кусты/камни)
             let decorations = [];
-            for(let i=0;i<220;i++) decorations.push({ x: Math.random()*WORLD_WIDTH, y: Math.random()*WORLD_HEIGHT, type: Math.floor(Math.random()*3) });
+            for(let i=0;i<180;i++) decorations.push({ x: Math.random()*WORLD_WIDTH, y: Math.random()*WORLD_HEIGHT, type: Math.floor(Math.random()*3) });
             
-            // ----- УПРАВЛЕНИЕ: клавиатура + джойстик -----
+            // ---------- ВРАГИ (начальные) ----------
+            function spawnEnemies(count) {
+                for(let i=0; i<count; i++) {
+                    let x = 300 + Math.random() * (WORLD_WIDTH - 600);
+                    let y = 300 + Math.random() * (WORLD_HEIGHT - 600);
+                    let ok = true;
+                    for(let w of walls) {
+                        if(x < w.x+w.w+40 && x+40 > w.x && y < w.y+w.h+40 && y+40 > w.y) ok=false;
+                    }
+                    if(Math.hypot(x - player.x, y - player.y) < 200) ok=false;
+                    if(ok) enemies.push(new Enemy(x, y));
+                    else enemies.push(new Enemy(800 + i*150, 800));
+                }
+            }
+            spawnEnemies(5);
+            
+            // ---------- УПРАВЛЕНИЕ (клавиатура + джойстик) ----------
             const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false };
-            
             window.addEventListener('keydown', (e) => {
                 let k = e.key;
                 if(keys.hasOwnProperty(k)) { keys[k]=true; e.preventDefault(); }
@@ -158,6 +395,8 @@
                 if(k==='s'||k==='S') keys.s=true;
                 if(k==='a'||k==='A') keys.a=true;
                 if(k==='d'||k==='D') keys.d=true;
+                // стрельба на пробел
+                if(k === ' ' || k === 'Space') { e.preventDefault(); performAttack(); }
             });
             window.addEventListener('keyup', (e) => {
                 let k = e.key;
@@ -168,21 +407,12 @@
                 if(k==='d'||k==='D') keys.d=false;
             });
             
-            // ----- ДЖОЙСТИК (сенсорный) -----
+            // Джойстик
             let joystickActive = false;
             let joystickVector = { x: 0, y: 0 };
             const joystickContainer = document.getElementById('joystickContainer');
             const joystickBase = document.getElementById('joystickBase');
             const joystickThumb = document.getElementById('joystickThumb');
-            
-            function getTouchPos(touch, element) {
-                const rect = element.getBoundingClientRect();
-                const scaleX = element.offsetWidth / rect.width;
-                const scaleY = element.offsetHeight / rect.height;
-                let x = (touch.clientX - rect.left) * scaleX;
-                let y = (touch.clientY - rect.top) * scaleY;
-                return { x, y };
-            }
             
             function updateJoystick(e) {
                 if (!joystickActive) return;
@@ -194,92 +424,158 @@
                 let dy = touch.clientY - centerY;
                 const maxDist = rect.width/2;
                 let dist = Math.hypot(dx, dy);
-                if (dist > maxDist) {
-                    dx = dx / dist * maxDist;
-                    dy = dy / dist * maxDist;
-                    dist = maxDist;
-                }
+                if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; }
                 joystickThumb.style.transform = `translate(${dx}px, ${dy}px)`;
-                let normX = dx / maxDist;
-                let normY = dy / maxDist;
-                joystickVector.x = normX;
-                joystickVector.y = normY;
+                joystickVector.x = dx / maxDist;
+                joystickVector.y = dy / maxDist;
             }
-            
-            function handleJoystickStart(e) {
-                e.preventDefault();
-                joystickActive = true;
-                updateJoystick(e);
-            }
-            
-            function handleJoystickEnd(e) {
-                joystickActive = false;
-                joystickVector.x = 0;
-                joystickVector.y = 0;
-                joystickThumb.style.transform = `translate(0px, 0px)`;
-            }
-            
+            function handleJoystickStart(e) { e.preventDefault(); joystickActive = true; updateJoystick(e); }
+            function handleJoystickEnd() { joystickActive = false; joystickVector = { x:0, y:0 }; joystickThumb.style.transform = `translate(0px, 0px)`; }
             joystickContainer.addEventListener('touchstart', handleJoystickStart);
-            window.addEventListener('touchmove', (e) => {
-                if (joystickActive) {
-                    e.preventDefault();
-                    updateJoystick(e);
-                }
-            });
+            window.addEventListener('touchmove', (e) => { if(joystickActive) { e.preventDefault(); updateJoystick(e); } });
             window.addEventListener('touchend', handleJoystickEnd);
-            // Для мыши (чтобы тестировать на ПК, если нужно)
-            joystickContainer.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                joystickActive = true;
-                updateJoystick(e);
-                window.addEventListener('mousemove', onMouseMove);
-                window.addEventListener('mouseup', onMouseUp);
-            });
-            function onMouseMove(e) {
-                if (joystickActive) updateJoystick(e);
-            }
-            function onMouseUp() {
-                handleJoystickEnd();
-                window.removeEventListener('mousemove', onMouseMove);
-                window.removeEventListener('mouseup', onMouseUp);
+            joystickContainer.addEventListener('mousedown', (e) => { e.preventDefault(); joystickActive=true; updateJoystick(e); window.addEventListener('mousemove', onMouseMove); window.addEventListener('mouseup', onMouseUp); });
+            function onMouseMove(e) { if(joystickActive) updateJoystick(e); }
+            function onMouseUp() { handleJoystickEnd(); window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); }
+            
+            // Атака с кнопки
+            const fireBtn = document.getElementById('fireButton');
+            fireBtn.addEventListener('click', (e) => { e.preventDefault(); performAttack(); });
+            fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); performAttack(); });
+            
+            function performAttack() {
+                if(currentWeapon.attackCooldown > 0) return;
+                // направление атаки = последнее движение
+                let dirX = player.dirX;
+                let dirY = player.dirY;
+                if(dirX === 0 && dirY === 0) { dirX = 1; dirY = 0; }
+                let len = Math.hypot(dirX, dirY);
+                if(len>0) { dirX /= len; dirY /= len; }
+                
+                if(currentWeapon.type === WeaponType.MELEE) {
+                    // ближняя атака: проверка врагов в радиусе
+                    let attackX = player.x + PLAYER_W/2;
+                    let attackY = player.y + PLAYER_H/2;
+                    for(let i=0; i<enemies.length; i++) {
+                        let e = enemies[i];
+                        let enemyCenterX = e.x + e.w/2;
+                        let enemyCenterY = e.y + e.h/2;
+                        let distToEnemy = Math.hypot(attackX - enemyCenterX, attackY - enemyCenterY);
+                        if(distToEnemy < currentWeapon.range) {
+                            e.hp -= currentWeapon.damage;
+                            if(e.hp <= 0) {
+                                enemies.splice(i,1);
+                                player.kills++;
+                                document.getElementById('kills').innerText = player.kills;
+                                i--;
+                            }
+                        }
+                    }
+                    // визуальный эффект
+                    createSwingEffect(attackX, attackY, dirX, dirY);
+                } else {
+                    // дальняя или магия: создаём снаряд
+                    let startX = player.x + PLAYER_W/2;
+                    let startY = player.y + PLAYER_H/2;
+                    let projectile = {
+                        x: startX, y: startY,
+                        vx: dirX * currentWeapon.projectileSpeed,
+                        vy: dirY * currentWeapon.projectileSpeed,
+                        damage: currentWeapon.damage,
+                        range: currentWeapon.range,
+                        traveled: 0,
+                        size: 8,
+                        color: currentWeapon.color,
+                        type: currentWeapon.type
+                    };
+                    projectiles.push(projectile);
+                }
+                currentWeapon.attackCooldown = currentWeapon.attackDelay;
+                // анимация зарядки в UI
             }
             
-            // ----- КОЛЛИЗИИ -----
-            function collision(newX, newY, w, h){
-                if(newX<0 || newY<0 || newX+w>WORLD_WIDTH || newY+h>WORLD_HEIGHT) return true;
-                for(let wall of walls)
-                    if(newX<wall.x+wall.w && newX+w>wall.x && newY<wall.y+wall.h && newY+h>wall.y) return true;
-                return false;
+            function createSwingEffect(cx, cy, dx, dy) {
+                // просто визуальный штрих, не влияет на геймплей
+                // (можно добавить в массив эффектов, но для простоты оставим)
             }
             
+            // Обновление снарядов
+            function updateProjectiles() {
+                for(let i=0; i<projectiles.length; i++) {
+                    let p = projectiles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.traveled += Math.hypot(p.vx, p.vy);
+                    // проверка стен
+                    let hitWall = false;
+                    for(let w of walls) {
+                        if(p.x > w.x && p.x < w.x+w.w && p.y > w.y && p.y < w.y+w.h) { hitWall=true; break; }
+                    }
+                    if(p.traveled > p.range || hitWall || p.x<0 || p.x>WORLD_WIDTH || p.y<0 || p.y>WORLD_HEIGHT) {
+                        projectiles.splice(i,1); i--; continue;
+                    }
+                    // попадание во врагов
+                    for(let j=0; j<enemies.length; j++) {
+                        let e = enemies[j];
+                        if(p.x > e.x && p.x < e.x+e.w && p.y > e.y && p.y < e.y+e.h) {
+                            e.hp -= p.damage;
+                            projectiles.splice(i,1);
+                            if(e.hp <= 0) {
+                                enemies.splice(j,1);
+                                player.kills++;
+                                document.getElementById('kills').innerText = player.kills;
+                                j--;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Перезарядка и обновление состояний
+            function updateCooldowns(deltaSec) {
+                if(currentWeapon.attackCooldown > 0) {
+                    currentWeapon.attackCooldown -= deltaSec;
+                    let fillPercent = 1 - (currentWeapon.attackCooldown / currentWeapon.attackDelay);
+                    document.getElementById('reloadFill').style.width = (fillPercent * 100) + '%';
+                } else {
+                    document.getElementById('reloadFill').style.width = '100%';
+                }
+                if(player.invincibleTimer > 0) player.invincibleTimer -= deltaSec;
+                // регенерация здоровья? нет, но пока пусть
+                if(player.hp > player.maxHp) player.hp = player.maxHp;
+                if(player.hp <= 0) { alert("Вы погибли! Обновляем игру"); location.reload(); }
+                document.getElementById('hpValue').innerText = Math.floor(player.hp);
+            }
+            
+            // Подбор оружия
+            function checkWeaponPickup() {
+                for(let i=0; i<weaponItems.length; i++) {
+                    let item = weaponItems[i];
+                    if(Math.abs(player.x - item.x) < 40 && Math.abs(player.y - item.y) < 40) {
+                        let newW = weaponsList[item.weaponIdx];
+                        currentWeapon = { ...newW, attackCooldown: 0 };
+                        document.getElementById('weaponInfo').innerHTML = `${newW.emoji} ${newW.name} (урон ${newW.damage})`;
+                        weaponItems.splice(i,1);
+                        break;
+                    }
+                }
+            }
+            
+            // Движение игрока
             function updateMovement() {
                 let moveX = 0, moveY = 0;
-                // клавиатура
                 if(keys.ArrowUp||keys.w) moveY-=1;
                 if(keys.ArrowDown||keys.s) moveY+=1;
                 if(keys.ArrowLeft||keys.a) moveX-=1;
                 if(keys.ArrowRight||keys.d) moveX+=1;
-                // джойстик
-                if(joystickVector.x !==0 || joystickVector.y !==0){
-                    moveX += joystickVector.x;
-                    moveY += joystickVector.y;
-                    let len = Math.hypot(moveX, moveY);
-                    if(len>1){ moveX/=len; moveY/=len; }
-                }
-                
-                if(moveX!==0 || moveY!==0) { 
-                    player.dirX = moveX; 
-                    player.dirY = moveY; 
-                    player.animTime += 0.2;
-                } else {
-                    player.animTime = 0;
-                }
-                
-                let lenM = Math.hypot(moveX,moveY);
-                if(lenM>0){ moveX/=lenM; moveY/=lenM; }
+                if(joystickVector.x !==0 || joystickVector.y !==0) { moveX += joystickVector.x; moveY += joystickVector.y; }
+                let len = Math.hypot(moveX,moveY);
+                if(len>0) { moveX/=len; moveY/=len; }
+                if(moveX!==0 || moveY!==0) { player.dirX = moveX; player.dirY = moveY; player.animTime += 0.2; }
+                else player.animTime = 0;
                 let deltaX = moveX * MOVE_SPEED;
                 let deltaY = moveY * MOVE_SPEED;
-                
                 let newX = player.x + deltaX;
                 if(!collision(newX, player.y, PLAYER_W, PLAYER_H)) player.x = newX;
                 else {
@@ -294,190 +590,111 @@
                 }
             }
             
-            // ----- КАМЕРА (следит за игроком) -----
-            let camera = {x:0, y:0};
-            function updateCamera() {
+            function collision(newX, newY, w, h){
+                if(newX<0 || newY<0 || newX+w>WORLD_WIDTH || newY+h>WORLD_HEIGHT) return true;
+                for(let wall of walls)
+                    if(newX<wall.x+wall.w && newX+w>wall.x && newY<wall.y+wall.h && newY+h>wall.y) return true;
+                return false;
+            }
+            
+            // Камера
+            let camera = {x:0,y:0};
+            function updateCamera(){
                 let tx = player.x + PLAYER_W/2 - CANVAS_W/2;
                 let ty = player.y + PLAYER_H/2 - CANVAS_H/2;
                 camera.x = Math.min(Math.max(0, tx), WORLD_WIDTH - CANVAS_W);
                 camera.y = Math.min(Math.max(0, ty), WORLD_HEIGHT - CANVAS_H);
             }
             
-            // ========== ОТРИСОВКА ==========
+            // Отрисовка мира (упрощённо)
             function drawGround() {
                 const grad = ctx.createLinearGradient(0, CANVAS_H, 0, 0);
-                grad.addColorStop(0, '#5d9652');
-                grad.addColorStop(1, '#2b522c');
-                ctx.fillStyle = grad;
-                ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-                // мелкие травинки
+                grad.addColorStop(0, '#5d9652'); grad.addColorStop(1, '#2b522c');
+                ctx.fillStyle = grad; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
                 for(let i=0;i<700;i++) {
-                    let worldX = (i*311)%WORLD_WIDTH;
-                    let worldY = (i*457)%WORLD_HEIGHT;
-                    let sx = worldX - camera.x;
-                    let sy = worldY - camera.y;
+                    let worldX = (i*311)%WORLD_WIDTH, worldY = (i*457)%WORLD_HEIGHT;
+                    let sx = worldX - camera.x, sy = worldY - camera.y;
                     if(sx>0 && sx<CANVAS_W && sy>0 && sy<CANVAS_H){
-                        ctx.fillStyle = `rgba(210, 240, 120, 0.25)`;
-                        ctx.beginPath();
-                        ctx.arc(sx, sy, 1.5, 0, Math.PI*2);
-                        ctx.fill();
+                        ctx.fillStyle = `rgba(210,240,120,0.25)`;
+                        ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI*2); ctx.fill();
                     }
                 }
             }
-            
             function drawWall(wall){
-                let x = wall.x - camera.x, y = wall.y - camera.y, w = wall.w, h = wall.h;
+                let x = wall.x-camera.x, y = wall.y-camera.y, w=wall.w, h=wall.h;
                 if(x+w<0 || x>CANVAS_W || y+h<0 || y>CANVAS_H) return;
-                ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                ctx.beginPath();
-                ctx.ellipse(x+w/2+2, y+h-3, w/2+4, 8,0,0,Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = '#5f5035';
-                ctx.fillRect(x, y+22, w, h);
-                ctx.fillStyle = '#897a51';
-                for(let i=0;i<6;i++){ ctx.fillRect(x+i*12, y+28, 6,4); ctx.fillRect(x+i*15+4, y+40, 7,4); }
-                ctx.fillStyle = '#b39d6b';
-                ctx.beginPath();
-                ctx.moveTo(x, y+22); ctx.lineTo(x+w, y+22); ctx.lineTo(x+w-5, y); ctx.lineTo(x+5, y);
-                ctx.fill();
-                ctx.fillStyle = '#ddbc82';
-                ctx.beginPath();
-                ctx.moveTo(x+7, y+5); ctx.lineTo(x+w-10, y+5); ctx.lineTo(x+w-8, y+20); ctx.lineTo(x+7, y+20);
-                ctx.fill();
-                ctx.fillStyle = '#473d28';
-                ctx.fillRect(x+w-6, y+20, 6, h);
+                ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x+w/2+2, y+h-3, w/2+4,8,0,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle='#5f5035'; ctx.fillRect(x, y+22, w, h);
+                ctx.fillStyle='#b39d6b'; ctx.beginPath(); ctx.moveTo(x,y+22); ctx.lineTo(x+w,y+22); ctx.lineTo(x+w-5,y); ctx.lineTo(x+5,y); ctx.fill();
+                ctx.fillStyle='#473d28'; ctx.fillRect(x+w-6, y+20, 6, h);
             }
-            
             function drawDecor(dec){
-                let x = dec.x - camera.x, y = dec.y - camera.y;
+                let x=dec.x-camera.x, y=dec.y-camera.y;
                 if(x<-50 || x>CANVAS_W+50 || y<-50 || y>CANVAS_H+50) return;
-                ctx.shadowBlur=3; ctx.shadowOffsetX=2; ctx.shadowOffsetY=2;
-                if(dec.type===0){
-                    ctx.fillStyle='#4c7a3a'; ctx.beginPath(); ctx.ellipse(x,y-4,12,8,0,0,Math.PI*2); ctx.fill();
-                    ctx.fillStyle='#6fa34f'; ctx.beginPath(); ctx.ellipse(x-3,y-9,8,7,0,0,Math.PI*2); ctx.fill();
-                } else if(dec.type===1){
-                    ctx.fillStyle='#6c6652'; ctx.beginPath(); ctx.ellipse(x,y,9,5,0,0,Math.PI*2); ctx.fill();
-                } else {
-                    ctx.fillStyle='#7a5a3a'; ctx.fillRect(x-7,y-6,14,10);
-                    ctx.fillStyle='#b88d55'; ctx.beginPath(); ctx.ellipse(x,y-6,7,4,0,0,Math.PI*2); ctx.fill();
-                }
-                ctx.shadowBlur=0;
+                ctx.fillStyle='#4c7a3a'; ctx.beginPath(); ctx.ellipse(x,y-4,12,8,0,0,Math.PI*2); ctx.fill();
             }
-            
             function drawPlayer() {
-                const px = player.x - camera.x;
-                const py = player.y - camera.y;
-                const centerX = px + PLAYER_W/2;
-                const centerY = py + PLAYER_H/2;
-                
-                ctx.fillStyle = 'rgba(0,0,0,0.45)';
-                ctx.beginPath();
-                ctx.ellipse(centerX+4, centerY+7, 22, 11, 0, 0, Math.PI*2);
-                ctx.fill();
-                
-                let step = Math.sin(player.animTime * Math.PI) * 2;
-                let bodyGrad = ctx.createLinearGradient(centerX-8, centerY-6+step*0.5, centerX+8, centerY+12+step*0.3);
-                bodyGrad.addColorStop(0, '#628e84');
-                bodyGrad.addColorStop(1, '#3b6b5e');
-                ctx.fillStyle = bodyGrad;
-                ctx.beginPath();
-                ctx.ellipse(centerX, centerY+3+step*0.2, 19, 21, 0, 0, Math.PI*2);
-                ctx.fill();
-                
-                ctx.fillStyle = '#2a5549';
-                ctx.beginPath();
-                ctx.moveTo(centerX-16, centerY+2+step*0.1);
-                ctx.quadraticCurveTo(centerX-6, centerY+18+step*0.3, centerX+14, centerY+2+step*0.1);
-                ctx.fill();
-                
-                ctx.fillStyle = '#c9894b';
-                ctx.fillRect(centerX-12, centerY+5+step*0.1, 24, 5);
-                
-                ctx.fillStyle = '#4f786c';
-                ctx.beginPath();
-                ctx.ellipse(centerX, centerY-9+step*0.1, 15, 16, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = '#6b9888';
-                ctx.beginPath();
-                ctx.ellipse(centerX-2, centerY-12+step*0.1, 9, 10, 0, 0, Math.PI*2);
-                ctx.fill();
-                
-                let eyeX = (player.dirX !== 0 || player.dirY !== 0) ? player.dirX * 2.2 : 0;
-                let eyeY = (player.dirX !== 0 || player.dirY !== 0) ? player.dirY * 1.6 : 1.2;
-                ctx.fillStyle = '#faf4e0';
-                ctx.beginPath();
-                ctx.ellipse(centerX-8 + eyeX*0.4, centerY-12 + eyeY*0.6 + step*0.05, 4.2, 4.8, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(centerX+5 + eyeX*0.4, centerY-12 + eyeY*0.6 + step*0.05, 4.2, 4.8, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = '#1f2f28';
-                ctx.beginPath();
-                ctx.ellipse(centerX-8 + eyeX, centerY-11 + eyeY*0.8 + step*0.05, 2.2, 2.8, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(centerX+5 + eyeX, centerY-11 + eyeY*0.8 + step*0.05, 2.2, 2.8, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(centerX-9 + eyeX*0.7, centerY-12.5 + eyeY*0.5 + step*0.05, 1, 0, Math.PI*2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(centerX+4 + eyeX*0.7, centerY-12.5 + eyeY*0.5 + step*0.05, 1, 0, Math.PI*2);
-                ctx.fill();
-                
-                ctx.beginPath();
-                ctx.strokeStyle = '#2d423a';
-                ctx.lineWidth = 2;
-                ctx.moveTo(centerX-13, centerY-17+step*0.05);
-                ctx.quadraticCurveTo(centerX-9, centerY-20+step*0.05, centerX-5, centerY-17.5+step*0.05);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(centerX+2, centerY-17.5+step*0.05);
-                ctx.quadraticCurveTo(centerX+6, centerY-20+step*0.05, centerX+11, centerY-17+step*0.05);
-                ctx.stroke();
-                
-                ctx.beginPath();
-                ctx.moveTo(centerX+15, centerY-2+step*0.1);
-                ctx.lineTo(centerX+26, centerY-12+step*0.1);
-                ctx.lineTo(centerX+24, centerY-14+step*0.1);
-                ctx.fillStyle = '#c0a16b';
-                ctx.fill();
-                ctx.fillStyle = '#e7c27d';
-                ctx.fillRect(centerX+16, centerY-6+step*0.1, 4, 12);
+                let px = player.x-camera.x, py = player.y-camera.y;
+                let cx = px+PLAYER_W/2, cy = py+PLAYER_H/2;
+                ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(cx+4, cy+7, 22, 11,0,0,Math.PI*2); ctx.fill();
+                let step = Math.sin(player.animTime * Math.PI)*2;
+                ctx.fillStyle='#628e84'; ctx.beginPath(); ctx.ellipse(cx, cy+3+step*0.2, 19,21,0,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle='#c9894b'; ctx.fillRect(cx-12, cy+5+step*0.1, 24,5);
+                ctx.fillStyle='#4f786c'; ctx.beginPath(); ctx.ellipse(cx, cy-9+step*0.1, 15,16,0,0,Math.PI*2); ctx.fill();
+                // глаза
+                let eyeX = (player.dirX!==0)?player.dirX*2:0, eyeY=(player.dirY!==0)?player.dirY*1.6:1;
+                ctx.fillStyle='#faf4e0'; ctx.beginPath(); ctx.ellipse(cx-8+eyeX*0.4, cy-12+eyeY*0.6+step*0.05,4.2,4.8,0,0,Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(cx+5+eyeX*0.4, cy-12+eyeY*0.6+step*0.05,4.2,4.8,0,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle='#1f2f28'; ctx.beginPath(); ctx.ellipse(cx-8+eyeX, cy-11+eyeY*0.8+step*0.05,2.2,2.8,0,0,Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(cx+5+eyeX, cy-11+eyeY*0.8+step*0.05,2.2,2.8,0,0,Math.PI*2); ctx.fill();
+            }
+            function drawWeaponItems() {
+                for(let it of weaponItems) {
+                    let x = it.x - camera.x, y = it.y - camera.y;
+                    if(x< -20 || x>CANVAS_W+20) continue;
+                    ctx.fillStyle = '#ffcc77'; ctx.shadowBlur=6;
+                    ctx.fillRect(x, y, it.w, it.h);
+                    ctx.fillStyle = '#aa8844'; ctx.fillRect(x+4, y+4, it.w-8, it.h-8);
+                    ctx.fillStyle = '#ffdd99'; ctx.font = "bold 20px monospace"; ctx.fillText(weaponsList[it.weaponIdx].emoji, x+6, y+22);
+                    ctx.shadowBlur=0;
+                }
+            }
+            function drawProjectiles() {
+                for(let p of projectiles) {
+                    let sx = p.x - camera.x, sy = p.y - camera.y;
+                    ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(sx, sy, p.size/1.5, 0, Math.PI*2); ctx.fill();
+                }
             }
             
-            function renderScene() {
+            let lastTimestamp = 0;
+            function renderScene(now) {
+                let delta = Math.min(0.033, (now - lastTimestamp) / 1000);
+                if(delta > 0) {
+                    updateCooldowns(delta);
+                    updateProjectiles();
+                    for(let e of enemies) e.update();
+                    updateMovement();
+                    checkWeaponPickup();
+                }
+                lastTimestamp = now;
                 updateCamera();
                 drawGround();
-                let objects = [];
-                for(let w of walls) objects.push({type:'wall', y: w.y+w.h+22, draw:()=>drawWall(w)});
-                for(let d of decorations) objects.push({type:'decor', y: d.y+12, draw:()=>drawDecor(d)});
-                objects.push({type:'player', y: player.y+PLAYER_H, draw:()=>drawPlayer()});
-                objects.sort((a,b)=>a.y - b.y);
-                for(let obj of objects) obj.draw();
-                // Легкая дымка для атмосферы
-                ctx.fillStyle = '#c0e0a020';
-                ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-                const fog = ctx.createLinearGradient(0,0,0,CANVAS_H*0.4);
-                fog.addColorStop(0,'#bcdd9a30'); fog.addColorStop(1,'transparent');
-                ctx.fillStyle = fog; ctx.fillRect(0,0,CANVAS_W,CANVAS_H*0.3);
+                for(let w of walls) drawWall(w);
+                for(let d of decorations) drawDecor(d);
+                drawWeaponItems();
+                for(let e of enemies) e.draw(ctx, camera);
+                drawProjectiles();
+                drawPlayer();
+                ctx.fillStyle = '#c0e0a020'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
             }
             
-            // ----- ИГРОВОЙ ЦИКЛ -----
-            function gameLoop() {
-                updateMovement();
-                renderScene();
+            function gameLoop(timestamp) {
+                renderScene(timestamp);
                 requestAnimationFrame(gameLoop);
             }
-            
-            // Убираем спавн в стене
-            while(collision(player.x, player.y, PLAYER_W, PLAYER_H)) {
-                player.x += 30; player.y += 30;
-                if(player.x > WORLD_WIDTH-100) player.x = WORLD_WIDTH/2;
-                if(player.y > WORLD_HEIGHT-100) player.y = WORLD_HEIGHT/2;
-            }
-            gameLoop();
+            // инициализация
+            scatterWeapons();
+            gameLoop(performance.now());
         })();
     </script>
 </body>
