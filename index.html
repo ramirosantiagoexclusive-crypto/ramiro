@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс переработан</title>
+    <title>2.5D Adventure - Босс работает</title>
     <style>
         * {
             margin: 0;
@@ -301,7 +301,7 @@
                 enemies.push(new Enemy(x,y,type));
             }
 
-            // ======================= НОВЫЙ ПРОСТОЙ БОСС =======================
+            // ---------- БОСС (МАКСИМАЛЬНО ПРОСТОЙ, РАБОТАЮЩИЙ) ----------
             let boss = null;
             class Boss {
                 constructor(x, y) {
@@ -311,60 +311,51 @@
                     this.h = 80;
                     this.hp = 400;
                     this.maxHp = 400;
-                    this.phase = 1; // 1 или 2
+                    this.phase = 1;
                     this.speed = 1.2;
                     
-                    // таймеры атак
-                    this.shootCooldown = 0;
-                    this.jumpCooldown = 0;
+                    this.shootTimer = 0;    // таймер до следующего выстрела
+                    this.jumpTimer = 0;     // таймер до следующего прыжка
                     
-                    // состояние прыжка
                     this.isJumping = false;
                     this.jumpProgress = 0;
                     this.jumpStart = { x: 0, y: 0 };
                     this.jumpTarget = { x: 0, y: 0 };
-                    this.jumpDamage = 30;
-                    this.jumpRadius = 70;
                     
-                    // снаряды
                     this.fireballs = [];
                     
-                    console.log("БОСС СОЗДАН!");
+                    console.log("БОСС СОЗДАН");
                 }
                 
                 update() {
+                    // 1. Если в прыжке
                     if (this.isJumping) {
-                        // анимация прыжка
                         this.jumpProgress += 0.05;
                         if (this.jumpProgress >= 1) {
                             // приземление
                             this.isJumping = false;
                             this.x = this.jumpTarget.x;
                             this.y = this.jumpTarget.y;
-                            // наносим урон в радиусе
+                            // урон в радиусе
                             const dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
                             const dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
                             const dist = Math.hypot(dx, dy);
-                            if (dist < this.jumpRadius) {
-                                player.hp -= this.jumpDamage;
+                            if (dist < 70) {
+                                player.hp -= 30;
                                 player.invTimer = 0.5;
-                                // частицы
-                                for (let i = 0; i < 20; i++) particles.push({ x: this.x + this.w/2, y: this.y + this.h/2, life: 0.4, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, color: "#f60" });
+                                for (let i = 0; i < 15; i++) particles.push({ x: this.x + this.w/2, y: this.y + this.h/2, life: 0.3, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, color: "#f60" });
                             }
-                            // эффект приземления
-                            for (let i = 0; i < 25; i++) particles.push({ x: this.x + this.w/2, y: this.y + this.h/2, life: 0.3, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, color: "#fa0" });
-                            this.jumpCooldown = 2.0; // перезарядка прыжка
+                            this.jumpTimer = 3.0;
                         } else {
-                            // интерполяция
+                            // плавное движение
                             this.x = this.jumpStart.x + (this.jumpTarget.x - this.jumpStart.x) * this.jumpProgress;
                             this.y = this.jumpStart.y + (this.jumpTarget.y - this.jumpStart.y) * this.jumpProgress;
                         }
-                        // обновляем снаряды
                         this.updateFireballs();
                         return;
                     }
                     
-                    // движение к игроку (если не в прыжке)
+                    // 2. Движение к игроку
                     const dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
                     const dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
                     const len = Math.hypot(dx, dy);
@@ -374,50 +365,47 @@
                         this.x += moveX;
                         this.y += moveY;
                     }
-                    // ограничение по миру
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
-                    // обновляем кулдауны
-                    if (this.shootCooldown > 0) this.shootCooldown -= 1/60;
-                    if (this.jumpCooldown > 0) this.jumpCooldown -= 1/60;
+                    // 3. Обновление таймеров
+                    if (this.shootTimer > 0) this.shootTimer -= 1/60;
+                    if (this.jumpTimer > 0) this.jumpTimer -= 1/60;
                     
-                    // атаки
-                    // стрельба: раз в 1.2 секунды (в фазе 2 чаще)
+                    // 4. Стрельба
                     const shootDelay = (this.phase === 1) ? 1.2 : 0.9;
-                    if (this.shootCooldown <= 0) {
+                    if (this.shootTimer <= 0) {
                         this.shoot();
-                        this.shootCooldown = shootDelay;
+                        this.shootTimer = shootDelay;
                     }
                     
-                    // прыжок: раз в 3 секунды, если игрок не слишком близко
-                    if (this.jumpCooldown <= 0 && !this.isJumping) {
+                    // 5. Прыжок
+                    if (this.jumpTimer <= 0 && !this.isJumping) {
                         const distToPlayer = Math.hypot((player.x + PLAYER_W/2) - (this.x + this.w/2), (player.y + PLAYER_H/2) - (this.y + this.h/2));
-                        if (distToPlayer > 100) { // прыгаем только если игрок на расстоянии
+                        if (distToPlayer > 100) {
                             this.startJump();
                         }
                     }
                     
-                    // смена фазы
+                    // 6. Смена фазы
                     if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
                         this.phase = 2;
                         this.speed = 1.8;
-                        console.log("БОСС ФАЗА 2!");
+                        console.log("ФАЗА 2");
                     }
                     
                     this.updateFireballs();
                 }
                 
                 shoot() {
-                    // направление на игрока
                     let dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
                     let dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
                     if (len < 0.01) { dx = 1; dy = 0; len = 1; }
                     dx /= len; dy /= len;
-                    // создаём снаряд с отступом от центра босса
-                    const startX = this.x + this.w/2 + dx * (this.w/2 + 10);
-                    const startY = this.y + this.h/2 + dy * (this.h/2 + 10);
+                    // стартовая позиция чуть дальше от центра босса
+                    const startX = this.x + this.w/2 + dx * 45;
+                    const startY = this.y + this.h/2 + dy * 45;
                     const damage = (this.phase === 1) ? 25 : 22;
                     const size = (this.phase === 1) ? 12 : 10;
                     const color = (this.phase === 1) ? "#ff6600" : "#ff8844";
@@ -432,14 +420,11 @@
                     this.isJumping = true;
                     this.jumpProgress = 0;
                     this.jumpStart = { x: this.x, y: this.y };
-                    // цель прыжка — позиция игрока
                     let targetX = player.x + PLAYER_W/2 - this.w/2;
                     let targetY = player.y + PLAYER_H/2 - this.h/2;
-                    // ограничиваем, чтобы не вылететь за мир
                     targetX = Math.min(Math.max(targetX, 0), WORLD_W - this.w);
                     targetY = Math.min(Math.max(targetY, 0), WORLD_H - this.h);
                     this.jumpTarget = { x: targetX, y: targetY };
-                    this.jumpCooldown = 3.0;
                 }
                 
                 updateFireballs() {
@@ -447,13 +432,11 @@
                         const f = this.fireballs[i];
                         f.x += f.vx;
                         f.y += f.vy;
-                        // удаляем, если вылетел далеко
                         if (f.x < -500 || f.x > WORLD_W + 500 || f.y < -500 || f.y > WORLD_H + 500) {
                             this.fireballs.splice(i, 1);
                             i--;
                             continue;
                         }
-                        // проверка попадания в игрока
                         const dx = f.x - (player.x + PLAYER_W/2);
                         const dy = f.y - (player.y + PLAYER_H/2);
                         if (Math.hypot(dx, dy) < 28) {
@@ -469,28 +452,20 @@
                     let x = this.x - cam.x;
                     let y = this.y - cam.y;
                     if (x + this.w < 0 || x > canvas.width || y + this.h < 0 || y > canvas.height) return;
-                    
-                    // тень
                     ctx.fillStyle = 'rgba(0,0,0,0.5)';
                     ctx.beginPath(); ctx.ellipse(x + this.w/2 + 5, y + this.h - 6, this.w/2 + 8, 12, 0, 0, Math.PI*2); ctx.fill();
-                    // тело
                     ctx.fillStyle = '#6a2c2c';
                     ctx.fillRect(x, y, this.w, this.h);
                     ctx.fillStyle = '#a04040';
                     ctx.fillRect(x + 5, y - 12, this.w - 10, 14);
-                    // глаза
                     ctx.fillStyle = '#ff8844';
                     ctx.beginPath(); ctx.arc(x + this.w * 0.3, y + this.h * 0.4, 9, 0, Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(x + this.w * 0.7, y + this.h * 0.4, 9, 0, Math.PI*2); ctx.fill();
                     ctx.fillStyle = '#ff3333';
                     ctx.beginPath(); ctx.arc(x + this.w * 0.3, y + this.h * 0.4, 4, 0, Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(x + this.w * 0.7, y + this.h * 0.4, 4, 0, Math.PI*2); ctx.fill();
-                    
-                    // полоска здоровья
                     const pct = this.hp / this.maxHp;
                     document.getElementById('bossFill').style.width = (pct * 100) + '%';
-                    
-                    // рисуем снаряды
                     for (let f of this.fireballs) {
                         let sx = f.x - cam.x;
                         let sy = f.y - cam.y;
@@ -503,11 +478,9 @@
                 
                 takeDamage(amount) {
                     this.hp -= amount;
-                    if (this.hp <= 0) return true;
-                    return false;
+                    return this.hp <= 0;
                 }
                 
-                // проверка коллизии с игроком
                 collidesWithPlayer() {
                     const pCenterX = player.x + PLAYER_W/2;
                     const pCenterY = player.y + PLAYER_H/2;
@@ -748,9 +721,8 @@
                 }
                 // столкновение с боссом
                 if(boss && !boss.isJumping && boss.collidesWithPlayer()){
-                    // отталкивание игрока от босса
                     let angle = Math.atan2((player.y+PLAYER_H/2) - (boss.y+boss.h/2), (player.x+PLAYER_W/2) - (boss.x+boss.w/2));
-                    let push = 8;
+                    let push = 10;
                     player.x += Math.cos(angle) * push;
                     player.y += Math.sin(angle) * push;
                     player.x = Math.min(Math.max(player.x,0), WORLD_W-PLAYER_W);
