@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - NippleJS Controls</title>
+    <title>2.5D Adventure - NippleJS Controls (fixed position)</title>
     <style>
         * {
             margin: 0;
@@ -26,16 +26,19 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            pointer-events: none; /* события захватывают div-зоны */
+            pointer-events: none;
         }
-        /* Зоны для джойстиков */
+        /* Зоны для джойстиков — только нижняя половина экрана */
         .joystick-area {
             position: fixed;
             bottom: 0;
             width: 50%;
-            height: 100%;
+            height: 50%;
             touch-action: none;
             z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .move-area {
             left: 0;
@@ -159,7 +162,6 @@
             .reload-bar { bottom: 100px; }
         }
     </style>
-    <!-- Подключаем библиотеку nipplejs -->
     <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
 </head>
 <body>
@@ -201,7 +203,7 @@
 
             // ---------- ОРУЖИЕ ----------
             let weapon = {
-                type: 0, // 0-меч,1-арбалет,2-магия
+                type: 0,
                 name: "Меч",
                 damage: 28,
                 cd: 0,
@@ -384,7 +386,6 @@
 
             // ---------- УПРАВЛЕНИЕ С NIPPLEJS ----------
             let moveVec = {x:0, y:0};
-            // Создаём джойстик для движения
             const moveZone = document.getElementById('moveArea');
             let moveJoystick = null;
             if (typeof nipplejs !== 'undefined') {
@@ -409,10 +410,9 @@
                 });
             }
 
-            // Создаём джойстик для атаки (при любом движении сразу атакуем)
+            // Создаём джойстик для атаки
             const attackZone = document.getElementById('attackArea');
             let attackJoystick = null;
-            let lastAttackTime = 0;
             if (typeof nipplejs !== 'undefined') {
                 attackJoystick = nipplejs.create({
                     zone: attackZone,
@@ -428,7 +428,6 @@
                 });
                 attackJoystick.on('move', function(evt, nipple) {
                     const vector = nipple.vector;
-                    // Нормализованное направление атаки
                     let dx = vector.x;
                     let dy = vector.y;
                     let len = Math.hypot(dx, dy);
@@ -438,14 +437,10 @@
                     } else {
                         dx = 1; dy = 0;
                     }
-                    // Выполняем атаку, но не чаще чем раз в кадр (через CD оружия)
                     performAttack({x: dx, y: dy});
-                }).on('end', function() {
-                    // Ничего не делаем
                 });
             }
 
-            // ---------- АТАКА (вызывается из джойстика и с ПК) ----------
             function performAttack(dir) {
                 if (weapon.cd > 0) return;
                 if (weapon.type === 0) { // melee
@@ -508,7 +503,6 @@
             });
             // Атака мышью по области attackZone (для ПК)
             attackZone.addEventListener('click', (e) => {
-                // Определяем направление от центра игрока к месту клика
                 const rect = attackZone.getBoundingClientRect();
                 const clickX = e.clientX;
                 const clickY = e.clientY;
@@ -588,7 +582,6 @@
                 document.getElementById('hp').innerText = Math.floor(player.hp);
             }
 
-            // ---------- ПОДБОР ОРУЖИЯ ----------
             function checkPickup() {
                 for (let i=0;i<items.length;i++) {
                     let it = items[i];
@@ -601,7 +594,6 @@
                 }
             }
 
-            // ---------- КАМЕРА ----------
             let camera = { x:0, y:0 };
             function updateCamera() {
                 let tx = player.x + PLAYER_W/2 - canvas.width/2;
@@ -610,7 +602,6 @@
                 camera.y = Math.min(Math.max(0, ty), WORLD_H - canvas.height);
             }
 
-            // ---------- СПАВН ВРАГОВ И БОССА ----------
             function updateSpawning(delta) {
                 if (boss) return;
                 spawnTimer += delta;
@@ -622,7 +613,6 @@
                 if (boss) boss.update();
             }
 
-            // ---------- СМЕРТЬ ----------
             let gameActive = true;
             function showDeath() {
                 if (!gameActive) return;
@@ -706,9 +696,7 @@
                     ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size,0,Math.PI*2); ctx.fill();
                 }
             }
-            function drawAim() {
-                // В этой версии не показываем линию прицела, так как атака происходит мгновенно
-            }
+            function drawAim() {}
 
             // ---------- ГЛАВНЫЙ ЦИКЛ ----------
             function frame(now) {
@@ -737,7 +725,6 @@
                 requestAnimationFrame(frame);
             }
 
-            // ИНИЦИАЛИЗАЦИЯ
             scatterItems();
             for (let i=0;i<4;i++) spawnEnemy();
             lastTime = performance.now();
