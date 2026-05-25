@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Полная версия с боссом</title>
+    <title>2.5D Adventure - Босс исправлен, отброс усилен</title>
     <style>
         * {
             margin: 0;
@@ -207,12 +207,12 @@
                 projSpeed: 0,
                 color: "#c0a16b",
                 emoji: "🗡️",
-                knockback: 12
+                knockback: 28   // увеличено с 12 до 28
             };
             const weapons = [
-                { type:0, name:"Меч", damage:28, delay:0.5, range:75, projSpeed:0, color:"#c0a16b", emoji:"🗡️", knockback:12 },
+                { type:0, name:"Меч", damage:28, delay:0.5, range:75, projSpeed:0, color:"#c0a16b", emoji:"🗡️", knockback:28 },
                 { type:1, name:"Арбалет", damage:18, delay:0.8, range:500, projSpeed:9, color:"#b87c4f", emoji:"🏹", knockback:0 },
-                { type:2, name:"Посох", damage:42, delay:1.1, range:550, projSpeed:7, color:"#aa66ff", emoji:"🔮", knockback:5 }
+                { type:2, name:"Посох", damage:42, delay:1.1, range:550, projSpeed:7, color:"#aa66ff", emoji:"🔮", knockback:10 }
             ];
 
             let projectiles = [];
@@ -282,7 +282,6 @@
                         let kb = weapon.knockback;
                         this.x += knockbackDir.x * kb;
                         this.y += knockbackDir.y * kb;
-                        // ограничим, чтобы не вылетел за мир
                         this.x = Math.min(Math.max(this.x,0), WORLD_W-this.w);
                         this.y = Math.min(Math.max(this.y,0), WORLD_H-this.h);
                     }
@@ -302,7 +301,7 @@
                 enemies.push(new Enemy(x,y,type));
             }
 
-            // ---------- БОСС (ИСПРАВЛЕН) ----------
+            // ---------- БОСС (ПЕРЕРАБОТАН) ----------
             let boss = null;
             class Boss {
                 constructor(x,y){
@@ -310,7 +309,7 @@
                     this.hp=400; this.maxHp=400;
                     this.phase=1;
                     this.attackTimer=0;
-                    this.cooldown=1.5;
+                    this.cooldown=1.2;
                     this.projectiles=[];
                 }
                 update(){
@@ -319,46 +318,53 @@
                             let dx = player.x+PLAYER_W/2 - (this.x+this.w/2);
                             let dy = player.y+PLAYER_H/2 - (this.y+this.h/2);
                             let len = Math.hypot(dx,dy);
-                            if(len>0){ dx/=len; dy/=len; }
+                            if(len>0){ dx/=len; dy/=len; } else { dx=1; dy=0; }
                             this.projectiles.push({ 
                                 x:this.x+this.w/2, y:this.y+this.h/2, 
-                                vx:dx*6.5, vy:dy*6.5, 
-                                damage:25, size:12, color:"#ff6600", 
-                                life:200 
+                                vx:dx*7.5, vy:dy*7.5, 
+                                damage:25, size:12, color:"#ff6600"
                             });
                         } else {
                             let ang = Math.atan2(player.y+PLAYER_H/2 - (this.y+this.h/2), player.x+PLAYER_W/2 - (this.x+this.w/2));
                             for(let i=-1;i<=1;i++){
                                 let a = ang + i*0.6;
-                                let vx = Math.cos(a)*6.5, vy = Math.sin(a)*6.5;
+                                let vx = Math.cos(a)*7, vy = Math.sin(a)*7;
                                 this.projectiles.push({ 
                                     x:this.x+this.w/2, y:this.y+this.h/2, 
                                     vx:vx, vy:vy, 
-                                    damage:22, size:10, color:"#ff8844", 
-                                    life:200 
+                                    damage:22, size:10, color:"#ff8844"
                                 });
                             }
                         }
                         this.attackTimer = this.cooldown;
-                    } else this.attackTimer -= 1/60;
+                    } else {
+                        this.attackTimer -= 1/60;
+                    }
+                    // обновляем снаряды и проверяем попадания
                     for(let i=0;i<this.projectiles.length;i++){
                         let p = this.projectiles[i];
-                        p.x += p.vx; p.y += p.vy;
-                        p.life--;
-                        // не удаляем по жизни, только если улетел далеко за пределы мира
-                        if(p.life<=0 || p.x<-500 || p.x>WORLD_W+500 || p.y<-500 || p.y>WORLD_H+500){
-                            this.projectiles.splice(i,1); i--; continue;
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        // удаляем, если вышли за пределы мира
+                        if(p.x<-500 || p.x>WORLD_W+500 || p.y<-500 || p.y>WORLD_H+500){
+                            this.projectiles.splice(i,1);
+                            i--;
+                            continue;
                         }
                         // проверка попадания в игрока
-                        if(Math.hypot(p.x-(player.x+PLAYER_W/2), p.y-(player.y+PLAYER_H/2)) < 28){
+                        let dx = p.x - (player.x+PLAYER_W/2);
+                        let dy = p.y - (player.y+PLAYER_H/2);
+                        let dist = Math.hypot(dx,dy);
+                        if(dist < 28){
                             player.hp -= p.damage;
                             player.invTimer = 0.5;
-                            this.projectiles.splice(i,1); i--;
+                            this.projectiles.splice(i,1);
+                            i--;
                         }
                     }
                     if(this.hp <= this.maxHp*0.5 && this.phase===1){
                         this.phase=2;
-                        this.cooldown=1.2;
+                        this.cooldown=0.9;
                     }
                 }
                 draw(cam){
@@ -514,7 +520,7 @@
                             if(kblen>0.01){ kbDir.x/=kblen; kbDir.y/=kblen; }
                             let dead = e.takeDamage(weapon.damage, kbDir);
                             hit = true;
-                            for(let p=0;p<6;p++) particles.push({ x:ex, y:ey, life:0.3, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, color:"#f44" });
+                            for(let p=0;p<8;p++) particles.push({ x:ex, y:ey, life:0.3, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4, color:"#f44" });
                             if(dead) {
                                 enemies.splice(i,1);
                                 player.kills++;
@@ -526,7 +532,7 @@
                     if (boss && Math.hypot(ax - (boss.x+boss.w/2), ay - (boss.y+boss.h/2)) < weapon.range+20) {
                         let dead = boss.takeDamage(weapon.damage);
                         hit = true;
-                        for(let p=0;p<10;p++) particles.push({ x:boss.x+boss.w/2, y:boss.y+boss.h/2, life:0.4, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4, color:"#f80" });
+                        for(let p=0;p<12;p++) particles.push({ x:boss.x+boss.w/2, y:boss.y+boss.h/2, life:0.4, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, color:"#f80" });
                         if(dead) { boss=null; document.getElementById('bossBar').style.display='none'; }
                     }
                     if(hit) {
@@ -535,7 +541,7 @@
                         meleeSwing.angle = Math.atan2(dir.y, dir.x);
                         meleeSwing.x = ax;
                         meleeSwing.y = ay;
-                        for(let i=0;i<12;i++) particles.push({ x:ax, y:ay, life:0.2, vx:Math.cos(Math.atan2(dir.y,dir.x)+ (Math.random()-0.5))*5, vy:Math.sin(Math.atan2(dir.y,dir.x)+ (Math.random()-0.5))*5, color:"#ffcc88" });
+                        for(let i=0;i<15;i++) particles.push({ x:ax, y:ay, life:0.25, vx:Math.cos(Math.atan2(dir.y,dir.x)+ (Math.random()-0.5))*6, vy:Math.sin(Math.atan2(dir.y,dir.x)+ (Math.random()-0.5))*6, color:"#ffcc88" });
                     }
                 } else {
                     let startX = player.x + PLAYER_W/2;
@@ -600,15 +606,13 @@
                     let minDist = (PLAYER_W/2 + e.w/2);
                     if(dist < minDist){
                         let angle = Math.atan2(overlapY, overlapX);
-                        let push = (minDist - dist) * 0.8;
+                        let push = (minDist - dist) * 0.9;
                         player.x += Math.cos(angle) * push;
                         player.y += Math.sin(angle) * push;
-                        // также оттолкнем врага
-                        e.x -= Math.cos(angle) * push * 0.5;
-                        e.y -= Math.sin(angle) * push * 0.5;
+                        e.x -= Math.cos(angle) * push * 0.6;
+                        e.y -= Math.sin(angle) * push * 0.6;
                     }
                 }
-                // границы после толчков
                 player.x = Math.min(Math.max(player.x,0), WORLD_W-PLAYER_W);
                 player.y = Math.min(Math.max(player.y,0), WORLD_H-PLAYER_H);
                 for(let e of enemies){
