@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - NippleJS Controls (fixed position)</title>
+    <title>2.5D Adventure - NippleJS Controls (исправлено направление)</title>
     <style>
         * {
             margin: 0;
@@ -28,7 +28,6 @@
             object-fit: cover;
             pointer-events: none;
         }
-        /* Зоны для джойстиков — только нижняя половина экрана */
         .joystick-area {
             position: fixed;
             bottom: 0;
@@ -40,13 +39,8 @@
             justify-content: center;
             align-items: center;
         }
-        .move-area {
-            left: 0;
-        }
-        .attack-area {
-            right: 0;
-        }
-        /* Интерфейс */
+        .move-area { left: 0; }
+        .attack-area { right: 0; }
         .ui {
             position: fixed;
             top: 15px;
@@ -387,9 +381,8 @@
             // ---------- УПРАВЛЕНИЕ С NIPPLEJS ----------
             let moveVec = {x:0, y:0};
             const moveZone = document.getElementById('moveArea');
-            let moveJoystick = null;
             if (typeof nipplejs !== 'undefined') {
-                moveJoystick = nipplejs.create({
+                nipplejs.create({
                     zone: moveZone,
                     mode: 'static',
                     lockY: false,
@@ -400,21 +393,19 @@
                     restJoystick: true,
                     shape: 'circle',
                     dynamicPage: true
-                });
-                moveJoystick.on('move', function(evt, nipple) {
+                }).on('move', function(evt, nipple) {
                     const vector = nipple.vector;
                     moveVec.x = vector.x;
-                    moveVec.y = vector.y;
+                    moveVec.y = -vector.y;   // инвертируем Y, так как nipplejs даёт Y положительный вверх
                 }).on('end', function() {
                     moveVec = {x:0, y:0};
                 });
             }
 
-            // Создаём джойстик для атаки
+            // Джойстик для атаки
             const attackZone = document.getElementById('attackArea');
-            let attackJoystick = null;
             if (typeof nipplejs !== 'undefined') {
-                attackJoystick = nipplejs.create({
+                nipplejs.create({
                     zone: attackZone,
                     mode: 'static',
                     lockY: false,
@@ -425,11 +416,10 @@
                     restJoystick: true,
                     shape: 'circle',
                     dynamicPage: true
-                });
-                attackJoystick.on('move', function(evt, nipple) {
+                }).on('move', function(evt, nipple) {
                     const vector = nipple.vector;
                     let dx = vector.x;
-                    let dy = vector.y;
+                    let dy = -vector.y;   // инвертируем Y
                     let len = Math.hypot(dx, dy);
                     if (len > 0.01) {
                         dx /= len;
@@ -487,7 +477,7 @@
                 weapon.cd = weapon.delay;
             }
 
-            // ---------- КЛАВИАТУРА (движение и атака) ----------
+            // ---------- КЛАВИАТУРА ----------
             let keyState = { w:false,s:false,a:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false };
             window.addEventListener('keydown', (e)=>{
                 let k = e.key;
@@ -501,7 +491,6 @@
                 let k = e.key;
                 if (keyState.hasOwnProperty(k)) keyState[k]=false;
             });
-            // Атака мышью по области attackZone (для ПК)
             attackZone.addEventListener('click', (e) => {
                 const rect = attackZone.getBoundingClientRect();
                 const clickX = e.clientX;
