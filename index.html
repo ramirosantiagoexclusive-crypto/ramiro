@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс наконец-то работает</title>
+    <title>2.5D Adventure - Босс работает (финал)</title>
     <style>
         * {
             margin: 0;
@@ -223,7 +223,7 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            // ---------- ОБЫЧНЫЙ ВРАГ (РАБОТАЕТ ИДЕАЛЬНО) ----------
+            // ---------- ОБЫЧНЫЙ ВРАГ (РАБОТАЕТ ОТЛИЧНО) ----------
             class Enemy {
                 constructor(x, y, type="normal") {
                     this.x = x; this.y = y; this.w = 32; this.h = 32;
@@ -238,7 +238,6 @@
                     this.attackTimer = 0;
                 }
                 update(delta) {
-                    // ЭТА ЛОГИКА ДВИЖЕНИЯ РАБОТАЕТ НА 100%
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -287,24 +286,27 @@
                 }
             }
             
-            // ---------- БОСС НАСЛЕДУЕТ ENEMY, НО С БОЛЬШИМИ РАЗМЕРАМИ И СИЛОЙ ----------
-            class Boss extends Enemy {
+            // ---------- БОСС - ПОЛНАЯ КОПИЯ ENEMY, НО С ДРУГИМИ РАЗМЕРАМИ И УРОНОМ ----------
+            class BossEnemy {
                 constructor(x, y) {
-                    super(x, y, "boss");
+                    this.x = x;
+                    this.y = y;
                     this.w = 76;
                     this.h = 76;
                     this.hp = 480;
                     this.maxHp = 480;
-                    this.speed = 3.2;      // Быстрее обычных врагов
-                    this.attackRadius = 65;  // Радиус атаки больше
+                    this.speed = 3.2;
+                    this.attackTimer = 0;
+                    this.attackRadius = 70;
                     this.attackDamage = 34;
                     this.phase = 1;
                     this.swingActive = false;
                     this.swingTimer = 0;
                 }
                 
+                // ТОЧНО ТАКОЙ ЖЕ update, КАК У ENEMY, НО С ДРУГИМИ ПАРАМЕТРАМИ
                 update(delta) {
-                    // Движение — ТОЧНО ТАКОЕ ЖЕ, КАК У ENEMY
+                    // Движение - один в один с Enemy
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -316,7 +318,7 @@
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
-                    // Атака: если игрок в радиусе attackRadius, наносим урон
+                    // Атака - с большим радиусом
                     const distToPlayer = Math.hypot(this.x+this.w/2 - (player.x+PLAYER_W/2), this.y+this.h/2 - (player.y+PLAYER_H/2));
                     if (this.attackTimer <= 0 && distToPlayer < this.attackRadius) {
                         if (player.invTimer <= 0) {
@@ -336,17 +338,17 @@
                             this.swingActive = true;
                             this.swingTimer = 0.2;
                         }
-                        this.attackTimer = 0.9; // перезарядка атаки
+                        this.attackTimer = 0.9;
                     }
                     if (this.attackTimer > 0) this.attackTimer -= delta;
                     
-                    // Анимация удара
+                    // Анимация
                     if (this.swingActive) {
                         this.swingTimer -= delta;
                         if (this.swingTimer <= 0) this.swingActive = false;
                     }
                     
-                    // Фаза 2 при 50% HP
+                    // Фаза 2
                     if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
                         this.phase = 2;
                         this.speed = 4.8;
@@ -358,6 +360,9 @@
                             });
                         }
                     }
+                    
+                    // Отладка: выводим координаты раз в 60 кадров
+                    if (Math.random() < 0.02) console.log("Босс на позиции: x=" + Math.floor(this.x) + ", y=" + Math.floor(this.y));
                 }
                 
                 draw(cam) {
@@ -370,7 +375,7 @@
                     ctx.ellipse(x + this.w/2 + 4, y + this.h - 8, this.w/2 + 8, 12, 0, 0, Math.PI*2);
                     ctx.fill();
                     
-                    // Тело босса
+                    // Тело
                     ctx.fillStyle = '#4a2a2a';
                     ctx.fillRect(x, y, this.w, this.h);
                     ctx.fillStyle = '#7a5a4a';
@@ -419,7 +424,7 @@
                     ctx.fillStyle = '#eecc88';
                     ctx.fillRect(x + this.w - 14, y + this.h*0.55, 18, 6);
                     
-                    // Эффект атаки (круг)
+                    // Эффект атаки
                     if (this.swingActive) {
                         const cx = x + this.w/2;
                         const cy = y + this.h/2;
@@ -440,11 +445,33 @@
                     const bossFill = document.getElementById('bossFill');
                     if (bossFill) bossFill.style.width = (pct * 100) + '%';
                     
-                    // Индикатор фазы
                     if (this.phase === 2) {
                         ctx.fillStyle = 'rgba(255,100,50,0.5)';
                         ctx.fillRect(x, y, this.w, 8);
                     }
+                }
+                
+                takeDamage(amount) {
+                    this.hp -= amount;
+                    for (let i = 0; i < 12; i++) {
+                        particles.push({
+                            x: this.x + this.w/2 + (Math.random() - 0.5) * 30,
+                            y: this.y + this.h/2 + (Math.random() - 0.5) * 30,
+                            life: 0.28,
+                            vx: (Math.random() - 0.5) * 6,
+                            vy: (Math.random() - 0.5) * 6,
+                            color: "#c44"
+                        });
+                    }
+                    return this.hp <= 0;
+                }
+                
+                collidesWithPlayer() {
+                    const pCenterX = player.x + PLAYER_W/2;
+                    const pCenterY = player.y + PLAYER_H/2;
+                    const bCenterX = this.x + this.w/2;
+                    const bCenterY = this.y + this.h/2;
+                    return Math.hypot(pCenterX - bCenterX, pCenterY - bCenterY) < (PLAYER_W/2 + this.w/2 + 10);
                 }
             }
             
@@ -467,7 +494,7 @@
                 let spawnY = player.y + (Math.random() - 0.5) * 400;
                 spawnX = Math.min(Math.max(spawnX, 100), WORLD_W - 100);
                 spawnY = Math.min(Math.max(spawnY, 100), WORLD_H - 100);
-                boss = new Boss(spawnX, spawnY);
+                boss = new BossEnemy(spawnX, spawnY);
                 document.getElementById('bossBar').style.display = 'block';
                 for (let i = 0; i < 55; i++) {
                     particles.push({
@@ -476,7 +503,7 @@
                         vy: (Math.random() - 0.5) * 12, color: "#ff8844"
                     });
                 }
-                console.log("БОСС ПОЯВИЛСЯ! Координаты: " + boss.x + ", " + boss.y);
+                console.log("БОСС СОЗДАН! Координаты: " + boss.x + ", " + boss.y);
             }
             
             function spawnMedkit(x,y){ medkits.push({x,y, w:20, h:20}); }
@@ -610,7 +637,7 @@
                         e.y = Math.min(Math.max(e.y,0), WORLD_H-e.h);
                     }
                 }
-                if(boss && boss.collidesWithPlayer){
+                if(boss && boss.collidesWithPlayer()){
                     let angle = Math.atan2((player.y+PLAYER_H/2)-(boss.y+boss.h/2), (player.x+PLAYER_W/2)-(boss.x+boss.w/2));
                     player.x += Math.cos(angle)*15;
                     player.y += Math.sin(angle)*15;
@@ -686,7 +713,11 @@
                 spawnTimer += delta;
                 if (spawnTimer > 5.0 && enemies.length < 7) { spawnTimer = 0; spawnEnemy(); }
                 if (!boss && !bossDefeated && player.kills >= 5) spawnBoss();
-                if (boss) boss.update(delta);
+                if (boss) {
+                    boss.update(delta);
+                    // Дополнительная отладка каждые 2 секунды
+                    if (Math.random() < 0.01) console.log("Босс обновлён, позиция: " + boss.x + ", " + boss.y);
+                }
             }
             function updateEnemies(delta) { for(let e of enemies) e.update(delta); }
             function updateCamera() {
