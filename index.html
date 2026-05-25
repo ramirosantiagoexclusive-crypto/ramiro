@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс-мечник атакует</title>
+    <title>2.5D Adventure - Босс-мечник (исправлен)</title>
     <style>
         * {
             margin: 0;
@@ -93,7 +93,7 @@
             top: 70px;
             left: 50%;
             transform: translateX(-50%);
-            width: 260px;
+            width: 280px;
             height: 18px;
             background: #3a1a1a;
             border-radius: 12px;
@@ -250,8 +250,8 @@
                     let len = Math.hypot(dx, dy);
                     if(len > 0.1) {
                         dx /= len; dy /= len;
-                        this.x += dx * this.speed;
-                        this.y += dy * this.speed;
+                        this.x += dx * this.speed * delta;
+                        this.y += dy * this.speed * delta;
                     }
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
@@ -291,7 +291,7 @@
                 }
             }
             
-            // ---------- НОВЫЙ БОСС: МЕЧНИК, ХОДИТ ЗА ИГРОКОМ И БЬЕТ КРУГОВОЙ АТАКОЙ ----------
+            // ---------- ИСПРАВЛЕННЫЙ БОСС: МЕЧНИК (ДВИГАЕТСЯ С УЧЁТОМ DELTA) ----------
             class BossSwordsman {
                 constructor(x, y) {
                     this.x = x;
@@ -300,63 +300,70 @@
                     this.h = 76;
                     this.hp = 480;
                     this.maxHp = 480;
-                    this.phase = 1;          // 1 - обычная, 2 - усиленная
-                    this.speed = 1.35;
-                    // Атака мечом (радиальный удар)
-                    this.attackCd = 0;        // таймер перезарядки атаки
-                    this.attackDelay = 1.3;   // секунд между атаками (в фазе 2 станет 0.9)
-                    this.attackRadius = 86;    // радиус удара
+                    this.phase = 1;
+                    this.speed = 140;        // пикселей в секунду (было 1.35 без дельты)
+                    this.attackCd = 0;
+                    this.attackDelay = 1.3;
+                    this.attackRadius = 86;
                     this.attackDamage = 32;
-                    // Эффект атаки
                     this.swingActive = false;
                     this.swingTimer = 0;
                     this.swingDuration = 0.2;
                 }
                 
                 update(delta) {
-                    // 1. Движение к игроку
+                    if (!delta || delta > 0.1) delta = 0.016;
+                    
+                    // Движение к игроку с учётом дельты
                     const dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
                     const dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
                     const len = Math.hypot(dx, dy);
-                    if (len > 0.5) {
-                        let moveX = (dx / len) * this.speed;
-                        let moveY = (dy / len) * this.speed;
+                    if (len > 0.01) {
+                        let moveX = (dx / len) * this.speed * delta;
+                        let moveY = (dy / len) * this.speed * delta;
                         this.x += moveX;
                         this.y += moveY;
                     }
-                    // Границы мира
-                    this.x = Math.min(Math.max(this.x, 8), WORLD_W - this.w - 8);
-                    this.y = Math.min(Math.max(this.y, 8), WORLD_H - this.h - 8);
                     
-                    // 2. Атака мечом (круговая) если кулдаун прошел и дистанция до игрока меньше радиуса атаки
+                    // Коллизия со стенами (чтобы не застревал)
+                    this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
+                    this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
+                    // Дополнительная проверка на стены (отталкивание от стен)
+                    for (let w of walls) {
+                        if (this.x < w.x + w.w && this.x + this.w > w.x && this.y < w.y + w.h && this.y + this.h > w.y) {
+                            // Простое отталкивание
+                            if (this.x + this.w/2 < w.x + w.w/2) this.x = w.x - this.w;
+                            else this.x = w.x + w.w;
+                            if (this.y + this.h/2 < w.y + w.h/2) this.y = w.y - this.h;
+                            else this.y = w.y + w.h;
+                        }
+                    }
+                    
+                    // Атака (круговая)
                     if (this.attackCd <= 0) {
                         const distToPlayer = Math.hypot(
                             (player.x + PLAYER_W/2) - (this.x + this.w/2),
                             (player.y + PLAYER_H/2) - (this.y + this.h/2)
                         );
-                        if (distToPlayer < this.attackRadius + 20) {
+                        if (distToPlayer < this.attackRadius + 25) {
                             this.performSwordAttack();
-                            // Устанавливаем кулдаун в зависимости от фазы
-                            const baseDelay = (this.phase === 1) ? 1.3 : 0.9;
+                            const baseDelay = (this.phase === 1) ? 1.3 : 0.85;
                             this.attackCd = baseDelay;
                         }
                     } else {
                         this.attackCd -= delta;
                     }
                     
-                    // 3. Обновление анимации удара
+                    // Анимация удара
                     if (this.swingActive) {
                         this.swingTimer -= delta;
-                        if (this.swingTimer <= 0) {
-                            this.swingActive = false;
-                        }
+                        if (this.swingTimer <= 0) this.swingActive = false;
                     }
                     
-                    // 4. Смена фазы при 50% HP (ускорение и более частая атака)
+                    // Смена фазы при 50% HP
                     if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
                         this.phase = 2;
-                        this.speed = 2.05;
-                        // Визуальный эффект смены фазы
+                        this.speed = 210;
                         for (let i = 0; i < 30; i++) {
                             particles.push({
                                 x: this.x + this.w/2, y: this.y + this.h/2,
@@ -364,50 +371,35 @@
                                 vy: (Math.random() - 0.5) * 8, color: "#ff6644"
                             });
                         }
-                        // Дополнительные искры
-                        for (let i = 0; i < 15; i++) {
-                            particles.push({
-                                x: this.x + this.w/2, y: this.y + this.h/2,
-                                life: 0.5, vx: (Math.random() - 0.5) * 6,
-                                vy: (Math.random() - 0.5) * 6, color: "#ffaa22"
-                            });
-                        }
                     }
                 }
                 
                 performSwordAttack() {
-                    // Наносим урон игроку, если он в радиусе
                     const centerX = this.x + this.w/2;
                     const centerY = this.y + this.h/2;
                     const playerCenterX = player.x + PLAYER_W/2;
                     const playerCenterY = player.y + PLAYER_H/2;
                     const distToPlayer = Math.hypot(centerX - playerCenterX, centerY - playerCenterY);
                     
-                    if (distToPlayer < this.attackRadius) {
-                        // Урон игроку с учетом инвиза
-                        if (player.invTimer <= 0) {
-                            player.hp -= this.attackDamage;
-                            player.invTimer = 0.55;
-                            // Эффект крови / искр
-                            for (let i = 0; i < 12; i++) {
-                                particles.push({
-                                    x: playerCenterX + (Math.random() - 0.5) * 20,
-                                    y: playerCenterY + (Math.random() - 0.5) * 20,
-                                    life: 0.3,
-                                    vx: (Math.random() - 0.5) * 5,
-                                    vy: (Math.random() - 0.5) * 5,
-                                    color: "#ff6666"
-                                });
-                            }
+                    if (distToPlayer < this.attackRadius && player.invTimer <= 0) {
+                        player.hp -= this.attackDamage;
+                        player.invTimer = 0.55;
+                        for (let i = 0; i < 14; i++) {
+                            particles.push({
+                                x: playerCenterX + (Math.random() - 0.5) * 24,
+                                y: playerCenterY + (Math.random() - 0.5) * 24,
+                                life: 0.3,
+                                vx: (Math.random() - 0.5) * 5,
+                                vy: (Math.random() - 0.5) * 5,
+                                color: "#ff6666"
+                            });
                         }
                     }
                     
-                    // Активируем визуальный эффект удара
                     this.swingActive = true;
                     this.swingTimer = this.swingDuration;
                     
-                    // Добавляем партиклы вокруг босса (круговая вспышка)
-                    for (let i = 0; i < 24; i++) {
+                    for (let i = 0; i < 28; i++) {
                         const angle = Math.random() * Math.PI * 2;
                         const rad = this.attackRadius * 0.8;
                         particles.push({
@@ -419,47 +411,28 @@
                             color: "#ffaa66"
                         });
                     }
-                    // Дополнительный ударный эффект
-                    for (let i = 0; i < 18; i++) {
-                        particles.push({
-                            x: centerX + (Math.random() - 0.5) * this.attackRadius,
-                            y: centerY + (Math.random() - 0.5) * this.attackRadius,
-                            life: 0.2,
-                            vx: (Math.random() - 0.5) * 4,
-                            vy: (Math.random() - 0.5) * 4,
-                            color: "#ff8844"
-                        });
-                    }
                 }
                 
                 draw(cam) {
                     let x = this.x - cam.x, y = this.y - cam.y;
                     if (x + this.w < 0 || x > canvas.width || y + this.h < 0 || y > canvas.height) return;
                     
-                    // Тень
                     ctx.fillStyle = 'rgba(0,0,0,0.55)';
                     ctx.beginPath();
                     ctx.ellipse(x + this.w/2 + 4, y + this.h - 8, this.w/2 + 8, 12, 0, 0, Math.PI*2);
                     ctx.fill();
                     
-                    // Тело босса - темный рыцарь
                     ctx.fillStyle = '#4a2a2a';
                     ctx.fillRect(x, y, this.w, this.h);
-                    // Доспехи
                     ctx.fillStyle = '#7a5a4a';
                     ctx.fillRect(x + 8, y - 10, this.w - 16, 14);
                     ctx.fillStyle = '#b87c4f';
                     ctx.fillRect(x + 12, y - 6, this.w - 24, 8);
-                    
-                    // Груда / нагрудник
                     ctx.fillStyle = '#8b5a3c';
-                    ctx.beginPath();
-                    ctx.rect(x + 10, y + 15, this.w - 20, 35);
-                    ctx.fill();
+                    ctx.fillRect(x + 10, y + 15, this.w - 20, 35);
                     ctx.fillStyle = '#c99a6b';
                     ctx.fillRect(x + 20, y + 25, this.w - 40, 12);
                     
-                    // Шлем с рогами
                     ctx.fillStyle = '#5a3a2a';
                     ctx.fillRect(x + 15, y - 6, this.w - 30, 18);
                     ctx.fillStyle = '#a66';
@@ -474,7 +447,6 @@
                     ctx.lineTo(x + this.w - 34, y - 4);
                     ctx.fill();
                     
-                    // Глаза (светятся)
                     ctx.fillStyle = '#ff6600';
                     ctx.beginPath();
                     ctx.arc(x + this.w*0.35, y + this.h*0.3, 6, 0, Math.PI*2);
@@ -490,73 +462,57 @@
                     ctx.arc(x + this.w*0.65 - 1, y + this.h*0.3 - 1, 2.5, 0, Math.PI*2);
                     ctx.fill();
                     
-                    // Меч в руке (статическое отображение)
                     ctx.fillStyle = '#bbb';
                     ctx.fillRect(x + this.w - 20, y + this.h*0.6, 28, 8);
                     ctx.fillStyle = '#eecc88';
                     ctx.fillRect(x + this.w - 12, y + this.h*0.55, 16, 4);
                     
-                    // Эффект атаки (круговая дуга)
                     if (this.swingActive) {
-                        const centerX = x + this.w/2;
-                        const centerY = y + this.h/2;
+                        const cx = x + this.w/2;
+                        const cy = y + this.h/2;
                         ctx.beginPath();
-                        ctx.arc(centerX, centerY, this.attackRadius - 8, 0, Math.PI*2);
+                        ctx.arc(cx, cy, this.attackRadius - 8, 0, Math.PI*2);
                         ctx.strokeStyle = '#ffaa33';
                         ctx.lineWidth = 8;
                         ctx.stroke();
                         ctx.beginPath();
-                        ctx.arc(centerX, centerY, this.attackRadius - 12, 0, Math.PI*2);
+                        ctx.arc(cx, cy, this.attackRadius - 12, 0, Math.PI*2);
                         ctx.strokeStyle = '#ffdd77';
                         ctx.lineWidth = 4;
                         ctx.stroke();
-                        // Кровавые брызги
-                        for (let i = 0; i < 6; i++) {
-                            const angle = Math.random() * Math.PI * 2;
-                            const rad = this.attackRadius - 5;
-                            ctx.fillStyle = '#ff8866';
-                            ctx.beginPath();
-                            ctx.arc(centerX + Math.cos(angle) * rad, centerY + Math.sin(angle) * rad, 3, 0, Math.PI*2);
-                            ctx.fill();
-                        }
                     }
                     
-                    // Полоска здоровья босса (обновляем в UI)
                     const pct = this.hp / this.maxHp;
                     const bossFill = document.getElementById('bossFill');
                     if (bossFill) bossFill.style.width = (pct * 100) + '%';
                     
-                    // Дополнительный индикатор фазы
                     if (this.phase === 2) {
-                        ctx.fillStyle = 'rgba(255,100,50,0.3)';
-                        ctx.fillRect(x, y, this.w, 6);
+                        ctx.fillStyle = 'rgba(255,100,50,0.4)';
+                        ctx.fillRect(x, y, this.w, 8);
                     }
                 }
                 
                 takeDamage(amount) {
                     this.hp -= amount;
-                    // Эффект крови при получении урона
-                    for (let i = 0; i < 6; i++) {
+                    for (let i = 0; i < 8; i++) {
                         particles.push({
-                            x: this.x + this.w/2 + (Math.random() - 0.5) * 20,
-                            y: this.y + this.h/2 + (Math.random() - 0.5) * 20,
-                            life: 0.2,
-                            vx: (Math.random() - 0.5) * 3,
-                            vy: (Math.random() - 0.5) * 3,
+                            x: this.x + this.w/2 + (Math.random() - 0.5) * 24,
+                            y: this.y + this.h/2 + (Math.random() - 0.5) * 24,
+                            life: 0.25,
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: (Math.random() - 0.5) * 4,
                             color: "#c44"
                         });
                     }
                     return this.hp <= 0;
                 }
                 
-                // Проверка столкновения с игроком для отталкивания
                 collidesWithPlayer() {
                     const pCenterX = player.x + PLAYER_W/2;
                     const pCenterY = player.y + PLAYER_H/2;
                     const bCenterX = this.x + this.w/2;
                     const bCenterY = this.y + this.h/2;
-                    const dist = Math.hypot(pCenterX - bCenterX, pCenterY - bCenterY);
-                    return dist < (PLAYER_W/2 + this.w/2 + 8);
+                    return Math.hypot(pCenterX - bCenterX, pCenterY - bCenterY) < (PLAYER_W/2 + this.w/2 + 8);
                 }
             }
             
@@ -575,14 +531,12 @@
             
             function spawnBoss() {
                 if (boss || bossDefeated) return;
-                // Появление босса в безопасном месте не слишком близко к игроку
-                let spawnX = player.x + (Math.random() - 0.5) * 450;
-                let spawnY = player.y + (Math.random() - 0.5) * 450;
+                let spawnX = player.x + (Math.random() - 0.5) * 500;
+                let spawnY = player.y + (Math.random() - 0.5) * 500;
                 spawnX = Math.min(Math.max(spawnX, 100), WORLD_W - 100);
                 spawnY = Math.min(Math.max(spawnY, 100), WORLD_H - 100);
                 boss = new BossSwordsman(spawnX, spawnY);
                 document.getElementById('bossBar').style.display = 'block';
-                // Добавляем эпический эффект появления
                 for (let i = 0; i < 40; i++) {
                     particles.push({
                         x: spawnX + 38, y: spawnY + 38,
@@ -644,7 +598,7 @@
             // --- АТАКА ИГРОКА ---
             function performAttack(dir) {
                 if (weapon.cd > 0) return;
-                if (weapon.type === 0) { // Melee
+                if (weapon.type === 0) {
                     let ax = player.x + PLAYER_W/2, ay = player.y + PLAYER_H/2;
                     let hit = false;
                     for (let i = 0; i < enemies.length; i++) {
@@ -672,7 +626,7 @@
                         meleeSwing.x = ax; meleeSwing.y = ay;
                         for(let i=0;i<15;i++) particles.push({ x:ax, y:ay, life:0.25, vx:Math.cos(Math.atan2(dir.y,dir.x)+(Math.random()-0.5))*6, vy:Math.sin(Math.atan2(dir.y,dir.x)+(Math.random()-0.5))*6, color:"#ffcc88" });
                     }
-                } else { // Ranged
+                } else {
                     projectiles.push({
                         x: player.x+PLAYER_W/2, y: player.y+PLAYER_H/2,
                         vx: dir.x * weapon.projSpeed, vy: dir.y * weapon.projSpeed,
@@ -708,7 +662,6 @@
                 let newY = player.y + my * SPEED;
                 if (!collision(newX, player.y, PLAYER_W, PLAYER_H)) player.x = newX;
                 if (!collision(player.x, newY, PLAYER_W, PLAYER_H)) player.y = newY;
-                // Отталкивание от врагов
                 for(let e of enemies){
                     let overlapX = (player.x+PLAYER_W/2)-(e.x+e.w/2), overlapY = (player.y+PLAYER_H/2)-(e.y+e.h/2);
                     let dist = Math.hypot(overlapX, overlapY);
