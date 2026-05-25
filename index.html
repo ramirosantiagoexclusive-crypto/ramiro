@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение: Битва с боссом</title>
+    <title>2.5D Приключение: Бой с боссом</title>
     <style>
         * {
             margin: 0;
@@ -66,50 +66,13 @@
             touch-action: none;
             cursor: grab;
         }
-        /* Джойстик прицеливания (только для телефона) */
-        .aim-container {
+        /* Кнопка Fire (стрельба/прицел) */
+        .fire-button {
             position: fixed;
             bottom: 40px;
             right: 30px;
-            width: 120px;
-            height: 120px;
-            background: rgba(30, 45, 40, 0.65);
-            backdrop-filter: blur(12px);
-            border-radius: 50%;
-            box-shadow: 0 0 0 2px rgba(200, 180, 100, 0.5);
-            touch-action: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-        .aim-base {
-            width: 90px;
-            height: 90px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 50%;
-            position: relative;
-        }
-        .aim-thumb {
-            width: 45px;
-            height: 45px;
-            background: #ffaa66;
-            border-radius: 50%;
-            position: absolute;
-            top: 22.5px;
-            left: 22.5px;
-            box-shadow: 0 2px 8px black;
-            transition: transform 0.02s linear;
-            touch-action: none;
-            cursor: grab;
-        }
-        /* Кнопка огня */
-        .fire-button {
-            position: fixed;
-            bottom: 180px;
-            right: 30px;
-            width: 70px;
-            height: 70px;
+            width: 80px;
+            height: 80px;
             background: rgba(180, 60, 40, 0.85);
             backdrop-filter: blur(10px);
             border-radius: 50%;
@@ -120,21 +83,20 @@
             font-weight: bold;
             color: white;
             text-shadow: 0 2px 4px black;
-            box-shadow: 0 0 0 3px #ffcc88;
+            box-shadow: 0 0 0 3px #ffcc88, 0 6px 15px black;
             cursor: pointer;
-            touch-action: manipulation;
+            touch-action: none;
             z-index: 100;
             transition: 0.05s linear;
         }
-        .fire-button:active { transform: scale(0.94); }
+        .fire-button:active {
+            transform: scale(0.96);
+        }
         @media (max-width: 768px) {
             .joystick-container { width: 120px; height: 120px; bottom: 25px; left: 20px; }
             .joystick-base { width: 95px; height: 95px; }
             .joystick-thumb { width: 47px; height: 47px; top: 24px; left: 24px; }
-            .aim-container { width: 100px; height: 100px; bottom: 25px; right: 20px; }
-            .aim-base { width: 75px; height: 75px; }
-            .aim-thumb { width: 38px; height: 38px; top: 18.5px; left: 18.5px; }
-            .fire-button { width: 60px; height: 60px; bottom: 150px; right: 20px; font-size: 1.5rem; }
+            .fire-button { width: 70px; height: 70px; bottom: 25px; right: 20px; font-size: 1.8rem; }
         }
         /* Интерфейс */
         .ui {
@@ -210,6 +172,14 @@
             .boss-health { width: 200px; top: 70px; }
             .reload-indicator { bottom: 115px; right: 25px; width: 50px; }
         }
+        /* Направляющая линия прицела (только при активном прицеливании) */
+        .aim-line-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 200;
+        }
     </style>
 </head>
 <body>
@@ -217,12 +187,9 @@
     <div class="joystick-container" id="joystickContainer">
         <div class="joystick-base"><div class="joystick-thumb" id="joystickThumb"></div></div>
     </div>
-    <div class="aim-container" id="aimContainer">
-        <div class="aim-base"><div class="aim-thumb" id="aimThumb"></div></div>
-    </div>
     <div class="fire-button" id="fireButton">⚔️</div>
     <div class="ui">❤️ <span id="hpValue">100</span> &nbsp;| 🧟‍♂️ <span id="kills">0</span></div>
-    <div class="weapon-info" id="weaponInfo">🗡️ Меч (урон 25)</div>
+    <div class="weapon-info" id="weaponInfo">🗡️ Меч (урон 28)</div>
     <div class="reload-indicator"><div class="reload-fill" id="reloadFill"></div></div>
     <div class="boss-health" id="bossHealthBar"><div class="boss-fill" id="bossFill"></div></div>
 
@@ -287,7 +254,6 @@
                     this.hp=45; this.maxHp=45;
                     this.speed=1.4;
                     this.attackTimer=0;
-                    this.type=type;
                 }
                 update() {
                     let dx = player.x+PLAYER_W/2 - (this.x+this.w/2);
@@ -322,7 +288,7 @@
                 constructor(x,y) {
                     this.x=x; this.y=y; this.w=70; this.h=70;
                     this.hp=300; this.maxHp=300;
-                    this.phase=1; // 1 или 2
+                    this.phase=1;
                     this.attackTimer=0;
                     this.attackCooldown=1.8;
                     this.projectiles=[];
@@ -330,14 +296,12 @@
                 update() {
                     if(this.attackTimer<=0) {
                         if(this.phase===1) {
-                            // один файербол с прицеливанием на игрока
                             let dx = player.x+PLAYER_W/2 - (this.x+this.w/2);
                             let dy = player.y+PLAYER_H/2 - (this.y+this.h/2);
                             let len = Math.hypot(dx,dy);
                             if(len>0) { dx/=len; dy/=len; }
                             this.projectiles.push({ x:this.x+this.w/2, y:this.y+this.h/2, vx:dx*6, vy:dy*6, damage:25, size:12, color:"#ff6600" });
                         } else {
-                            // три файербола веером
                             let baseAngle = Math.atan2(player.y+PLAYER_H/2 - (this.y+this.h/2), player.x+PLAYER_W/2 - (this.x+this.w/2));
                             for(let i=-1; i<=1; i++) {
                                 let angle = baseAngle + i*0.5;
@@ -350,12 +314,10 @@
                     } else {
                         this.attackTimer -= 1/60;
                     }
-                    // обновление снарядов босса
                     for(let i=0;i<this.projectiles.length;i++) {
                         let p=this.projectiles[i];
                         p.x+=p.vx; p.y+=p.vy;
                         if(p.x<0 || p.x>WORLD_WIDTH || p.y<0 || p.y>WORLD_HEIGHT) { this.projectiles.splice(i,1); i--; continue; }
-                        // попадание в игрока
                         if(Math.hypot(p.x - (player.x+PLAYER_W/2), p.y - (player.y+PLAYER_H/2)) < 25) {
                             player.hp -= p.damage;
                             player.invincibleTimer = 0.5;
@@ -363,7 +325,6 @@
                             i--;
                         }
                     }
-                    // переход фазы
                     if(this.hp <= this.maxHp*0.5 && this.phase===1) {
                         this.phase=2;
                         this.attackCooldown=1.2;
@@ -444,7 +405,7 @@
                 if(k==='s'||k==='S') keys.s=true;
                 if(k==='a'||k==='A') keys.a=true;
                 if(k==='d'||k==='D') keys.d=true;
-                if(k===' '||k==='Space') { e.preventDefault(); performAttack(); }
+                if(k===' '||k==='Space') { e.preventDefault(); performAttackMouse(); }
             });
             window.addEventListener('keyup', (e)=>{
                 let k=e.key;
@@ -480,61 +441,90 @@
             function onMoveMove(e){ if(moveActive) updateMove(e); }
             function onMoveUp(){ endMove(); window.removeEventListener('mousemove',onMoveMove); window.removeEventListener('mouseup',onMoveUp); }
             
-            // Джойстик прицеливания (только для телефона)
-            let aimVec={x:1,y:0}, aimActive=false;
-            const aimBase=document.querySelector('#aimContainer .aim-base');
-            const aimThumb=document.getElementById('aimThumb');
-            function updateAim(e){
-                if(!aimActive) return;
-                const touch=e.touches?e.touches[0]:e;
-                const rect=aimBase.getBoundingClientRect();
-                let dx=touch.clientX - (rect.left+rect.width/2);
-                let dy=touch.clientY - (rect.top+rect.height/2);
-                const maxDist=rect.width/2;
-                let dist=Math.hypot(dx,dy);
-                if(dist>maxDist){ dx=dx/dist*maxDist; dy=dy/dist*maxDist; }
-                aimThumb.style.transform=`translate(${dx}px, ${dy}px)`;
-                aimVec.x=dx/maxDist; aimVec.y=dy/maxDist;
-                if(aimVec.x===0 && aimVec.y===0) { aimVec.x=1; aimVec.y=0; }
-            }
-            function startAim(e){ e.preventDefault(); aimActive=true; updateAim(e); }
-            function endAim(){ aimActive=false; aimVec={x:1,y:0}; aimThumb.style.transform='translate(0px,0px)'; }
-            document.getElementById('aimContainer').addEventListener('touchstart',startAim);
-            window.addEventListener('touchmove',(e)=>{ if(aimActive){ e.preventDefault(); updateAim(e); } });
-            window.addEventListener('touchend',endAim);
-            document.getElementById('aimContainer').addEventListener('mousedown',(e)=>{ e.preventDefault(); aimActive=true; updateAim(e); window.addEventListener('mousemove',onAimMove); window.addEventListener('mouseup',onAimUp); });
-            function onAimMove(e){ if(aimActive) updateAim(e); }
-            function onAimUp(){ endAim(); window.removeEventListener('mousemove',onAimMove); window.removeEventListener('mouseup',onAimUp); }
+            // ---------- СТРЕЛЬБА/ПРИЦЕЛ (одна кнопка) ----------
+            let aiming = false;
+            let aimDirection = { x:1, y:0 };
+            let aimStartX = 0, aimStartY = 0;
+            const fireBtn = document.getElementById('fireButton');
             
-            // Мышь для прицеливания на ПК
-            let mouseX=CANVAS_W/2+100, mouseY=CANVAS_H/2;
-            canvas.addEventListener('mousemove',(e)=>{ const rect=canvas.getBoundingClientRect(); mouseX=(e.clientX-rect.left)*CANVAS_W/rect.width; mouseY=(e.clientY-rect.top)*CANVAS_H/rect.height; });
-            
-            function getAimDirection() {
-                if(window.innerWidth<=768) { // телефон
-                    if(aimVec.x===0 && aimVec.y===0) return {x:1,y:0};
-                    return {x:aimVec.x, y:aimVec.y};
-                } else {
-                    let dx = mouseX - (player.x - camera.x + PLAYER_W/2);
-                    let dy = mouseY - (player.y - camera.y + PLAYER_H/2);
-                    let len=Math.hypot(dx,dy);
-                    if(len<0.01) return {x:1,y:0};
-                    return {x:dx/len, y:dy/len};
-                }
-            }
-            
-            // Атака
-            const fireBtn=document.getElementById('fireButton');
-            fireBtn.addEventListener('click',(e)=>{ e.preventDefault(); performAttack(); });
-            fireBtn.addEventListener('touchstart',(e)=>{ e.preventDefault(); performAttack(); });
-            
-            function performAttack() {
+            // На ПК: клик — выстрел по курсору
+            function performAttackMouse() {
                 if(currentWeapon.attackCooldown>0) return;
-                let dir = getAimDirection();
-                if(currentWeapon.type===WeaponType.MELEE) {
+                let dir = getMouseDirection();
+                executeAttack(dir);
+            }
+            function getMouseDirection() {
+                let playerScreenX = player.x - camera.x + PLAYER_W/2;
+                let playerScreenY = player.y - camera.y + PLAYER_H/2;
+                let dx = mouseX - playerScreenX;
+                let dy = mouseY - playerScreenY;
+                let len = Math.hypot(dx,dy);
+                if(len<0.01) return {x:1,y:0};
+                return {x:dx/len, y:dy/len};
+            }
+            
+            // Мобильное устройство: при нажатии на кнопку начинаем прицеливание (палец можно двигать)
+            fireBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if(currentWeapon.attackCooldown>0) return;
+                aiming = true;
+                const touch = e.touches[0];
+                aimStartX = touch.clientX;
+                aimStartY = touch.clientY;
+                // начальное направление (вперёд)
+                aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
+                // Добавляем визуальную линию
+            });
+            
+            fireBtn.addEventListener('touchmove', (e) => {
+                if(!aiming) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                let dx = touch.clientX - aimStartX;
+                let dy = touch.clientY - aimStartY;
+                let len = Math.hypot(dx,dy);
+                if(len > 5) {
+                    aimDirection.x = dx / len;
+                    aimDirection.y = dy / len;
+                } else {
+                    aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
+                }
+            });
+            
+            fireBtn.addEventListener('touchend', (e) => {
+                if(!aiming) return;
+                e.preventDefault();
+                aiming = false;
+                executeAttack(aimDirection);
+            });
+            
+            // Для мыши на телефоне (отладка) — клик
+            fireBtn.addEventListener('mousedown', (e) => {
+                if(window.innerWidth > 768) return; // на ПК отдельно
+                e.preventDefault();
+                if(currentWeapon.attackCooldown>0) return;
+                aiming = true;
+                const rect = fireBtn.getBoundingClientRect();
+                aimStartX = rect.left + rect.width/2;
+                aimStartY = rect.top + rect.height/2;
+                aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
+            });
+            fireBtn.addEventListener('mouseup', (e) => {
+                if(window.innerWidth > 768) return;
+                e.preventDefault();
+                if(aiming) {
+                    aiming = false;
+                    executeAttack(aimDirection);
+                }
+            });
+            
+            // Общая функция атаки
+            function executeAttack(dir) {
+                if(currentWeapon.attackCooldown>0) return;
+                if(currentWeapon.type === WeaponType.MELEE) {
                     let attackX = player.x+PLAYER_W/2;
                     let attackY = player.y+PLAYER_H/2;
-                    let hit=false;
+                    let hit = false;
                     for(let i=0;i<enemies.length;i++) {
                         let e=enemies[i];
                         let ecx=e.x+e.w/2, ecy=e.y+e.h/2;
@@ -565,6 +555,10 @@
                 }
                 currentWeapon.attackCooldown=currentWeapon.attackDelay;
             }
+            
+            // Мышь для прицела на ПК
+            let mouseX=CANVAS_W/2+100, mouseY=CANVAS_H/2;
+            canvas.addEventListener('mousemove',(e)=>{ const rect=canvas.getBoundingClientRect(); mouseX=(e.clientX-rect.left)*CANVAS_W/rect.width; mouseY=(e.clientY-rect.top)*CANVAS_H/rect.height; });
             
             function updateProjectiles() {
                 for(let i=0;i<projectiles.length;i++) {
@@ -648,7 +642,6 @@
             }
             
             // Спавн босса после 5 убийств
-            let lastKills=0;
             function checkBossSpawn() {
                 if(!boss && player.kills>=5) spawnBoss();
                 if(boss) boss.update();
@@ -709,7 +702,10 @@
             }
             function drawProjectiles(){ for(let p of projectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size/1.5,0,Math.PI*2); ctx.fill(); } }
             function drawAimLine(){
-                let dir=getAimDirection();
+                let dir;
+                if(aiming) dir = aimDirection;
+                else if(window.innerWidth > 768) dir = getMouseDirection();
+                else return;
                 let startX=player.x-camera.x+PLAYER_W/2, startY=player.y-camera.y+PLAYER_H/2;
                 let endX=startX+dir.x*60, endY=startY+dir.y*60;
                 ctx.beginPath(); ctx.moveTo(startX,startY); ctx.lineTo(endX,endY);
