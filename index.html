@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс атакует!</title>
+    <title>2.5D Adventure - Босс атакует (исправлен)</title>
     <style>
         * {
             margin: 0;
@@ -173,12 +173,11 @@
 
     <script>
         (function(){
-            // --- РАЗМЕРЫ МИРА И ИГРОКА ---
+            // --- РАЗМЕРЫ МИРА ---
             const WORLD_W = 2600, WORLD_H = 2300;
             const PLAYER_W = 34, PLAYER_H = 34;
             const SPEED = 5.2;
             
-            // --- ЭЛЕМЕНТЫ ---
             let canvas = document.getElementById('canvas');
             let ctx = canvas.getContext('2d');
             let gameActive = true;
@@ -202,7 +201,7 @@
             ];
             let weapon = { ...weaponsLib[0], cd: 0 };
             
-            // --- МАССИВЫ ---
+            // --- ДИНАМИЧЕСКИЕ МАССИВЫ ---
             let enemies = [];
             let projectiles = [];
             let particles = [];
@@ -223,7 +222,6 @@
             let moveVec = {x:0, y:0};
             let meleeSwing = { active: false, angle: 0, timer: 0, duration: 0.15, x:0, y:0 };
             
-            // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
             function resizeCanvas() {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
@@ -231,7 +229,7 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            // --- КЛАСС ВРАГА ---
+            // ---------- ВРАГ ----------
             class Enemy {
                 constructor(x, y, type="normal") {
                     this.x = x; this.y = y; this.w = 32; this.h = 32;
@@ -292,7 +290,7 @@
                 }
             }
             
-            // --- ИСПРАВЛЕННЫЙ БОСС (ГАРАНТИРОВАННО АТАКУЕТ) ---
+            // ---------- БОСС (ПЕРЕПИСАН, ГАРАНТИРОВАННО РАБОТАЕТ) ----------
             class Boss {
                 constructor(x, y) {
                     this.x = x; this.y = y;
@@ -301,78 +299,48 @@
                     this.phase = 1;
                     this.speed = 1.2;
                     this.shootTimer = 0;
-                    this.jumpTimer = 0;
-                    this.isJumping = false;
-                    this.jumpProgress = 0;
-                    this.jumpStart = { x:0, y:0 };
-                    this.jumpTarget = { x:0, y:0 };
                     this.fireballs = [];
                 }
                 
                 update(delta) {
-                    // 1. Обработка прыжка
-                    if (this.isJumping) {
-                        this.jumpProgress += delta * 2.5;
-                        if (this.jumpProgress >= 1) {
-                            this.isJumping = false;
-                            this.x = this.jumpTarget.x;
-                            this.y = this.jumpTarget.y;
-                            // Урон при приземлении
-                            const dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
-                            const dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
-                            if (Math.hypot(dx, dy) < 70) {
-                                player.hp -= 30;
-                                player.invTimer = 0.5;
-                                this.addBurstParticles(this.x+this.w/2, this.y+this.h/2, "#f60", 15);
-                            }
-                            this.jumpTimer = 2.5;
-                        } else {
-                            this.x = this.jumpStart.x + (this.jumpTarget.x - this.jumpStart.x) * this.jumpProgress;
-                            this.y = this.jumpStart.y + (this.jumpTarget.y - this.jumpStart.y) * this.jumpProgress;
-                        }
-                        this.updateFireballs(delta);
-                        return;
-                    }
-                    
-                    // 2. Движение к игроку (если не прыгает)
+                    // 1. Движение к игроку
                     const dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
                     const dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
                     const len = Math.hypot(dx, dy);
-                    if (len > 0.1) {
+                    if (len > 0.5) {
                         let moveX = (dx / len) * this.speed;
                         let moveY = (dy / len) * this.speed;
                         this.x += moveX;
                         this.y += moveY;
                     }
+                    // Границы
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
-                    // 3. Обновление таймеров
-                    if (this.shootTimer > 0) this.shootTimer -= delta;
-                    if (this.jumpTimer > 0) this.jumpTimer -= delta;
-                    
-                    // 4. Стрельба (обязательно сработает)
-                    const shootDelay = (this.phase === 1) ? 1.1 : 0.8;
+                    // 2. Стрельба
                     if (this.shootTimer <= 0) {
                         this.shoot();
+                        const shootDelay = (this.phase === 1) ? 1.2 : 0.8;
                         this.shootTimer = shootDelay;
+                    } else {
+                        this.shootTimer -= delta;
                     }
                     
-                    // 5. Прыжок, если игрок далеко
-                    if (this.jumpTimer <= 0 && !this.isJumping) {
-                        const distToPlayer = Math.hypot((player.x+PLAYER_W/2) - (this.x+this.w/2), (player.y+PLAYER_H/2) - (this.y+this.h/2));
-                        if (distToPlayer > 130) {
-                            this.startJump();
+                    // 3. Смена фазы при 50% HP
+                    if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
+                        this.phase = 2;
+                        this.speed = 1.9;
+                        // Визуальный эффект смены фазы
+                        for (let i = 0; i < 25; i++) {
+                            particles.push({
+                                x: this.x + this.w/2, y: this.y + this.h/2,
+                                life: 0.5, vx: (Math.random() - 0.5) * 7,
+                                vy: (Math.random() - 0.5) * 7, color: "#ff8844"
+                            });
                         }
                     }
                     
-                    // 6. Смена фазы
-                    if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
-                        this.phase = 2;
-                        this.speed = 1.8;
-                        this.addBurstParticles(this.x+this.w/2, this.y+this.h/2, "#ff8844", 30);
-                    }
-                    
+                    // 4. Обновление снарядов босса
                     this.updateFireballs(delta);
                 }
                 
@@ -389,31 +357,20 @@
                     const startY = this.y + this.h/2 + dy * 45;
                     const damage = (this.phase === 1) ? 25 : 22;
                     const size = (this.phase === 1) ? 12 : 10;
-                    const color = (this.phase === 1) ? "#ff6600" : "#ff8844";
-                    const speed = (this.phase === 1) ? 8.5 : 10.0;
+                    const color = (this.phase === 1) ? "#ff6600" : "#ffaa44";
+                    const speed = (this.phase === 1) ? 8.0 : 10.0;
                     
                     this.fireballs.push({
                         x: startX, y: startY,
                         vx: dx * speed, vy: dy * speed,
-                        damage: damage, size: size, color: color,
-                        life: true
+                        damage: damage, size: size, color: color
                     });
-                }
-                
-                startJump() {
-                    this.isJumping = true;
-                    this.jumpProgress = 0;
-                    this.jumpStart = { x: this.x, y: this.y };
-                    let targetX = player.x + PLAYER_W/2 - this.w/2;
-                    let targetY = player.y + PLAYER_H/2 - this.h/2;
-                    targetX = Math.min(Math.max(targetX, 0), WORLD_W - this.w);
-                    targetY = Math.min(Math.max(targetY, 0), WORLD_H - this.h);
-                    this.jumpTarget = { x: targetX, y: targetY };
                 }
                 
                 updateFireballs(delta) {
                     for (let i = 0; i < this.fireballs.length; i++) {
                         const f = this.fireballs[i];
+                        // Движение снаряда
                         f.x += f.vx;
                         f.y += f.vy;
                         // Удаление за пределами мира
@@ -430,6 +387,15 @@
                             player.invTimer = 0.5;
                             this.fireballs.splice(i, 1);
                             i--;
+                            // Эффект попадания
+                            for (let p = 0; p < 6; p++) {
+                                particles.push({
+                                    x: f.x, y: f.y, life: 0.3,
+                                    vx: (Math.random() - 0.5) * 4,
+                                    vy: (Math.random() - 0.5) * 4,
+                                    color: "#ff6600"
+                                });
+                            }
                         }
                     }
                 }
@@ -437,18 +403,23 @@
                 draw(cam) {
                     let x = this.x - cam.x, y = this.y - cam.y;
                     if (x + this.w < 0 || x > canvas.width || y + this.h < 0 || y > canvas.height) return;
+                    // Тень
                     ctx.fillStyle = 'rgba(0,0,0,0.5)';
                     ctx.beginPath(); ctx.ellipse(x+this.w/2+5, y+this.h-6, this.w/2+8,12,0,0,Math.PI*2); ctx.fill();
+                    // Тело
                     ctx.fillStyle = '#6a2c2c'; ctx.fillRect(x, y, this.w, this.h);
                     ctx.fillStyle = '#a04040'; ctx.fillRect(x+5, y-12, this.w-10, 14);
+                    // Глаза
                     ctx.fillStyle = '#ff8844';
                     ctx.beginPath(); ctx.arc(x+this.w*0.3, y+this.h*0.4, 9, 0, Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(x+this.w*0.7, y+this.h*0.4, 9, 0, Math.PI*2); ctx.fill();
                     ctx.fillStyle = '#ff3333';
                     ctx.beginPath(); ctx.arc(x+this.w*0.3, y+this.h*0.4, 4, 0, Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(x+this.w*0.7, y+this.h*0.4, 4, 0, Math.PI*2); ctx.fill();
+                    // Полоска здоровья
                     const pct = this.hp / this.maxHp;
                     document.getElementById('bossFill').style.width = (pct * 100) + '%';
+                    // Снаряды босса
                     for (let f of this.fireballs) {
                         let sx = f.x - cam.x, sy = f.y - cam.y;
                         ctx.fillStyle = f.color;
@@ -467,17 +438,6 @@
                     const pCenterX = player.x+PLAYER_W/2, pCenterY = player.y+PLAYER_H/2;
                     const bCenterX = this.x+this.w/2, bCenterY = this.y+this.h/2;
                     return Math.hypot(pCenterX - bCenterX, pCenterY - bCenterY) < (PLAYER_W/2 + this.w/2);
-                }
-                
-                addBurstParticles(cx, cy, color, count) {
-                    for(let i=0; i<count; i++) {
-                        particles.push({
-                            x: cx, y: cy, life: 0.4,
-                            vx: (Math.random() - 0.5) * 6,
-                            vy: (Math.random() - 0.5) * 6,
-                            color: color
-                        });
-                    }
                 }
             }
             
@@ -540,7 +500,6 @@
                     .on('move', (evt, nipple) => { const v = nipple.vector; let dx=v.x, dy=-v.y; let len=Math.hypot(dx,dy); if(len>0.01){ dx/=len; dy/=len; } else { dx=1; dy=0; } performAttack({x:dx, y:dy}); });
             }
             document.getElementById('attackArea').addEventListener('click', (e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
                 let dx = e.clientX - (player.x - camera.x + PLAYER_W/2);
                 let dy = e.clientY - (player.y - camera.y + PLAYER_H/2);
                 let len = Math.hypot(dx, dy);
@@ -630,11 +589,13 @@
                         e.y = Math.min(Math.max(e.y,0), WORLD_H-e.h);
                     }
                 }
-                if(boss && !boss.isJumping && boss.collidesWithPlayer()){
+                if(boss && boss.collidesWithPlayer()){
                     let angle = Math.atan2((player.y+PLAYER_H/2)-(boss.y+boss.h/2), (player.x+PLAYER_W/2)-(boss.x+boss.w/2));
-                    player.x += Math.cos(angle)*10; player.y += Math.sin(angle)*10;
+                    player.x += Math.cos(angle)*12;
+                    player.y += Math.sin(angle)*12;
                     player.x = Math.min(Math.max(player.x,0), WORLD_W-PLAYER_W);
                     player.y = Math.min(Math.max(player.y,0), WORLD_H-PLAYER_H);
+                    // Босс тоже получает небольшой отскок?
                 }
             }
             
@@ -798,7 +759,7 @@
                 requestAnimationFrame(gameLoop);
             }
             
-            // --- СТАРТ ---
+            // --- ЗАПУСК ---
             scatterItems();
             scatterMedkits();
             for(let i=0;i<5;i++) spawnEnemy();
