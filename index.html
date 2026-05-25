@@ -26,9 +26,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            pointer-events: none; /* все события захватывают div-зоны */
+            pointer-events: none;
         }
-        /* Зона движения (левая половина) */
         .move-zone {
             position: fixed;
             bottom: 0;
@@ -38,7 +37,6 @@
             touch-action: none;
             z-index: 100;
         }
-        /* Зона атаки (правая половина) */
         .attack-zone {
             position: fixed;
             bottom: 0;
@@ -48,7 +46,6 @@
             touch-action: none;
             z-index: 100;
         }
-        /* Визуальный джойстик */
         .joystick-container {
             position: absolute;
             bottom: 40px;
@@ -59,7 +56,6 @@
             backdrop-filter: blur(12px);
             border-radius: 50%;
             box-shadow: 0 0 0 2px rgba(200, 180, 100, 0.6);
-            touch-action: none;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -82,10 +78,8 @@
             left: 27.5px;
             box-shadow: 0 2px 8px black;
             transition: transform 0.02s linear;
-            touch-action: none;
             cursor: grab;
         }
-        /* Прицельная точка */
         .aim-dot {
             position: fixed;
             width: 24px;
@@ -99,7 +93,6 @@
             display: none;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
-        /* Интерфейс */
         .ui {
             position: fixed;
             top: 15px;
@@ -394,7 +387,8 @@
                     ctx.fillStyle='#ff8844'; ctx.beginPath(); ctx.arc(x+this.w*0.3, y+this.h*0.4,7,0,Math.PI*2); ctx.arc(x+this.w*0.7, y+this.h*0.4,7,0,Math.PI*2); ctx.fill();
                     ctx.fillStyle='#ff3333'; ctx.beginPath(); ctx.arc(x+this.w*0.3, y+this.h*0.4,3,0,Math.PI*2); ctx.arc(x+this.w*0.7, y+this.h*0.4,3,0,Math.PI*2); ctx.fill();
                     let hpPercent=this.hp/this.maxHp;
-                    document.getElementById('bossFill').style.width = (hpPercent*100)+'%';
+                    const bossFill = document.getElementById('bossFill');
+                    if(bossFill) bossFill.style.width = (hpPercent*100)+'%';
                     for(let p of this.projectiles) {
                         let sx=p.x-camera.x, sy=p.y-camera.y;
                         ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size/1.5,0,Math.PI*2); ctx.fill();
@@ -409,7 +403,8 @@
             function spawnBoss() {
                 if(boss) return;
                 boss = new Boss(WORLD_WIDTH/2, WORLD_HEIGHT/2);
-                document.getElementById('bossHealthBar').style.display = 'block';
+                const bossBar = document.getElementById('bossHealthBar');
+                if(bossBar) bossBar.style.display = 'block';
             }
             
             // ---------- ПРЕДМЕТЫ ОРУЖИЯ ----------
@@ -464,17 +459,19 @@
                 const maxDist = rect.width/2;
                 let dist = Math.hypot(dx,dy);
                 if(dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
-                moveThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+                if(moveThumb) moveThumb.style.transform = `translate(${dx}px, ${dy}px)`;
                 moveVec.x = dx / maxDist;
                 moveVec.y = dy / maxDist;
             }
             function startMove(e) { e.preventDefault(); moveActive=true; updateMove(e); }
-            function endMove() { moveActive=false; moveVec={x:0,y:0}; moveThumb.style.transform='translate(0px,0px)'; }
+            function endMove() { moveActive=false; moveVec={x:0,y:0}; if(moveThumb) moveThumb.style.transform='translate(0px,0px)'; }
             const moveZone = document.getElementById('moveZone');
-            moveZone.addEventListener('touchstart', startMove);
+            if(moveZone) {
+                moveZone.addEventListener('touchstart', startMove);
+                moveZone.addEventListener('mousedown', startMove);
+            }
             window.addEventListener('touchmove', (e)=>{ if(moveActive) { e.preventDefault(); updateMove(e); } });
             window.addEventListener('touchend', endMove);
-            moveZone.addEventListener('mousedown', startMove);
             window.addEventListener('mousemove', (e)=>{ if(moveActive) updateMove(e); });
             window.addEventListener('mouseup', endMove);
             
@@ -491,9 +488,11 @@
                 aimStart.x = touch.clientX;
                 aimStart.y = touch.clientY;
                 aimDir = { x: player.dirX || 1, y: player.dirY || 0 };
-                aimDot.style.display = 'block';
-                aimDot.style.left = touch.clientX + 'px';
-                aimDot.style.top = touch.clientY + 'px';
+                if(aimDot) {
+                    aimDot.style.display = 'block';
+                    aimDot.style.left = touch.clientX + 'px';
+                    aimDot.style.top = touch.clientY + 'px';
+                }
             }
             function moveAim(e) {
                 if(!aiming) return;
@@ -508,40 +507,42 @@
                 } else {
                     aimDir = { x: player.dirX || 1, y: player.dirY || 0 };
                 }
-                aimDot.style.left = touch.clientX + 'px';
-                aimDot.style.top = touch.clientY + 'px';
+                if(aimDot) {
+                    aimDot.style.left = touch.clientX + 'px';
+                    aimDot.style.top = touch.clientY + 'px';
+                }
             }
             function endAim(e) {
                 if(!aiming) return;
                 e.preventDefault();
                 aiming = false;
-                aimDot.style.display = 'none';
+                if(aimDot) aimDot.style.display = 'none';
                 if(currentWeapon.attackCooldown <= 0) {
                     executeAttack(aimDir);
                 }
             }
-            attackZone.addEventListener('touchstart', startAim);
-            attackZone.addEventListener('touchmove', moveAim);
-            attackZone.addEventListener('touchend', endAim);
-            attackZone.addEventListener('mousedown', startAim);
-            attackZone.addEventListener('mousemove', (e)=>{ if(aiming) moveAim(e); });
-            attackZone.addEventListener('mouseup', endAim);
-            
-            // Быстрая атака кликом на ПК
-            attackZone.addEventListener('click', (e) => {
-                if(window.innerWidth > 768 && currentWeapon.attackCooldown <= 0) {
-                    let rect = attackZone.getBoundingClientRect();
-                    let clickX = e.clientX;
-                    let clickY = e.clientY;
-                    let centerX = player.x - camera.x + PLAYER_W/2;
-                    let centerY = player.y - camera.y + PLAYER_H/2;
-                    let dx = clickX - centerX;
-                    let dy = clickY - centerY;
-                    let len = Math.hypot(dx,dy);
-                    if(len>0.01) { dx/=len; dy/=len; } else { dx=1; dy=0; }
-                    executeAttack({x:dx, y:dy});
-                }
-            });
+            if(attackZone) {
+                attackZone.addEventListener('touchstart', startAim);
+                attackZone.addEventListener('touchmove', moveAim);
+                attackZone.addEventListener('touchend', endAim);
+                attackZone.addEventListener('mousedown', startAim);
+                attackZone.addEventListener('mousemove', (e)=>{ if(aiming) moveAim(e); });
+                attackZone.addEventListener('mouseup', endAim);
+                attackZone.addEventListener('click', (e) => {
+                    if(window.innerWidth > 768 && currentWeapon.attackCooldown <= 0) {
+                        let rect = attackZone.getBoundingClientRect();
+                        let clickX = e.clientX;
+                        let clickY = e.clientY;
+                        let centerX = player.x - camera.x + PLAYER_W/2;
+                        let centerY = player.y - camera.y + PLAYER_H/2;
+                        let dx = clickX - centerX;
+                        let dy = clickY - centerY;
+                        let len = Math.hypot(dx,dy);
+                        if(len>0.01) { dx/=len; dy/=len; } else { dx=1; dy=0; }
+                        executeAttack({x:dx, y:dy});
+                    }
+                });
+            }
             
             function executeAttack(dir) {
                 if(currentWeapon.attackCooldown > 0) return;
@@ -558,14 +559,15 @@
                             if(e.hp <= 0) {
                                 enemies.splice(i,1);
                                 player.kills++;
-                                document.getElementById('kills').innerText = player.kills;
+                                const killsSpan = document.getElementById('kills');
+                                if(killsSpan) killsSpan.innerText = player.kills;
                                 i--;
                             }
                         }
                     }
                     if(boss && Math.hypot(ax - (boss.x+boss.w/2), ay - (boss.y+boss.h/2)) < currentWeapon.range+15) {
                         let dead = boss.takeDamage(currentWeapon.damage);
-                        if(dead) { boss=null; document.getElementById('bossHealthBar').style.display='none'; }
+                        if(dead) { boss=null; const bossBar = document.getElementById('bossHealthBar'); if(bossBar) bossBar.style.display='none'; }
                         hit = true;
                     }
                     if(hit) {
@@ -637,14 +639,14 @@
                         if(p.x>e.x && p.x<e.x+e.w && p.y>e.y && p.y<e.y+e.h) {
                             e.hp -= p.damage;
                             projectiles.splice(i,1);
-                            if(e.hp<=0) { enemies.splice(j,1); player.kills++; document.getElementById('kills').innerText=player.kills; j--; }
+                            if(e.hp<=0) { enemies.splice(j,1); player.kills++; const killsSpan = document.getElementById('kills'); if(killsSpan) killsSpan.innerText = player.kills; j--; }
                             break;
                         }
                     }
                     if(boss && p.x>boss.x && p.x<boss.x+boss.w && p.y>boss.y && p.y<boss.y+boss.h) {
                         let dead = boss.takeDamage(p.damage);
                         projectiles.splice(i,1);
-                        if(dead) { boss=null; document.getElementById('bossHealthBar').style.display='none'; }
+                        if(dead) { boss=null; const bossBar = document.getElementById('bossHealthBar'); if(bossBar) bossBar.style.display='none'; }
                     }
                 }
             }
@@ -653,15 +655,20 @@
                 if(currentWeapon.attackCooldown > 0) {
                     currentWeapon.attackCooldown -= delta;
                     let fill = 1 - currentWeapon.attackCooldown/currentWeapon.attackDelay;
-                    document.getElementById('reloadFill').style.width = (fill*100)+'%';
-                } else document.getElementById('reloadFill').style.width = '100%';
+                    const reloadFill = document.getElementById('reloadFill');
+                    if(reloadFill) reloadFill.style.width = (fill*100)+'%';
+                } else {
+                    const reloadFill = document.getElementById('reloadFill');
+                    if(reloadFill) reloadFill.style.width = '100%';
+                }
                 if(meleeSwing.active) {
                     meleeSwing.timer -= delta;
                     if(meleeSwing.timer <= 0) meleeSwing.active = false;
                 }
                 if(player.invincibleTimer > 0) player.invincibleTimer -= delta;
                 if(player.hp > player.maxHp) player.hp = player.maxHp;
-                document.getElementById('hpValue').innerText = Math.floor(player.hp);
+                const hpSpan = document.getElementById('hpValue');
+                if(hpSpan) hpSpan.innerText = Math.floor(player.hp);
             }
             
             function checkWeaponPickup() {
@@ -670,7 +677,8 @@
                     if(Math.abs(player.x - it.x) < 45 && Math.abs(player.y - it.y) < 45) {
                         let newW = weaponsList[it.weaponIdx];
                         currentWeapon = { ...newW, attackCooldown: 0 };
-                        document.getElementById('weaponInfo').innerHTML = `${newW.emoji} ${newW.name} (урон ${newW.damage})`;
+                        const weaponInfo = document.getElementById('weaponInfo');
+                        if(weaponInfo) weaponInfo.innerHTML = `${newW.emoji} ${newW.name} (урон ${newW.damage})`;
                         weaponItems.splice(i,1); break;
                     }
                 }
