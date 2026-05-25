@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение: Раздельное управление</title>
+    <title>2.5D Adventure: Dual Control</title>
     <style>
         * {
             margin: 0;
@@ -26,29 +26,29 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            pointer-events: none; /* canvas не перехватывает события, всё управление через div-зоны */
+            pointer-events: none;  /* все события захватывают div-зоны */
         }
-        /* Зона движения (левая нижняя четверть) */
+        /* Зона движения (левая половина) */
         .move-zone {
             position: fixed;
             bottom: 0;
             left: 0;
             width: 50%;
-            height: 50%;
+            height: 100%;
             touch-action: none;
             z-index: 100;
         }
-        /* Зона атаки (правая нижняя четверть) */
+        /* Зона атаки (правая половина) */
         .attack-zone {
             position: fixed;
             bottom: 0;
             right: 0;
             width: 50%;
-            height: 50%;
+            height: 100%;
             touch-action: none;
             z-index: 100;
         }
-        /* Визуальный джойстик внутри зоны движения */
+        /* Визуальный джойстик */
         .joystick-container {
             position: absolute;
             bottom: 40px;
@@ -85,7 +85,7 @@
             touch-action: none;
             cursor: grab;
         }
-        /* Прицельная точка (отображается при прицеливании) */
+        /* Прицельная точка */
         .aim-dot {
             position: fixed;
             width: 24px;
@@ -168,7 +168,6 @@
             background: #e44;
             transition: width 0.2s;
         }
-        /* Окно смерти */
         .death-overlay {
             position: fixed;
             top: 0;
@@ -181,7 +180,6 @@
             justify-content: center;
             align-items: center;
             z-index: 300;
-            font-family: system-ui;
         }
         .death-window {
             background: #2a1f1a;
@@ -190,12 +188,8 @@
             text-align: center;
             color: #ffccaa;
             border: 2px solid #ff8844;
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
         }
-        .death-window h2 {
-            font-size: 2rem;
-            margin-bottom: 20px;
-        }
+        .death-window h2 { font-size: 2rem; margin-bottom: 20px; }
         .death-window button {
             background: #ff8844;
             border: none;
@@ -223,20 +217,20 @@
             color: #ffefc0aa;
             font-size: 11px;
             pointer-events: none;
-            z-index: 100;
             background: rgba(0,0,0,0.4);
             padding: 4px;
-            border-radius: 20px;
             width: fit-content;
             margin: 0 auto;
+            border-radius: 20px;
             backdrop-filter: blur(4px);
+            z-index: 100;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
     <div class="move-zone" id="moveZone">
-        <div class="joystick-container" id="joystickContainer">
+        <div class="joystick-container">
             <div class="joystick-base"><div class="joystick-thumb" id="joystickThumb"></div></div>
         </div>
     </div>
@@ -250,10 +244,9 @@
 
     <script>
         (function(){
+            // ---------- НАСТРОЙКИ МИРА ----------
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
-            
-            // Размеры мира
             const WORLD_WIDTH = 2800;
             const WORLD_HEIGHT = 2200;
             const PLAYER_W = 38;
@@ -262,19 +255,19 @@
             
             let CANVAS_W = window.innerWidth;
             let CANVAS_H = window.innerHeight;
-            function resizeCanvas() {
+            function resize() {
                 CANVAS_W = window.innerWidth;
                 CANVAS_H = window.innerHeight;
                 canvas.width = CANVAS_W;
                 canvas.height = CANVAS_H;
+                updateCamera();
             }
-            window.addEventListener('resize', () => { resizeCanvas(); updateCamera(); });
-            resizeCanvas();
+            window.addEventListener('resize', resize);
+            resize();
             
             // ---------- ИГРОК ----------
             let player = {
-                x: WORLD_WIDTH / 2,
-                y: WORLD_HEIGHT / 2,
+                x: WORLD_WIDTH/2, y: WORLD_HEIGHT/2,
                 dirX: 0, dirY: 1,
                 animTime: 0,
                 hp: 100, maxHp: 100,
@@ -291,7 +284,6 @@
                 range: 75, projectileSpeed: 0,
                 color: "#c0a16b", emoji: "🗡️"
             };
-            
             const weaponsList = [
                 { type:WeaponType.MELEE, name:"Меч", damage:28, attackDelay:0.5, range:75, projectileSpeed:0, color:"#c0a16b", emoji:"🗡️" },
                 { type:WeaponType.RANGED, name:"Арбалет", damage:18, attackDelay:0.8, range:500, projectileSpeed:9, color:"#b87c4f", emoji:"🏹" },
@@ -376,9 +368,7 @@
                             }
                         }
                         this.attackTimer = this.attackCooldown;
-                    } else {
-                        this.attackTimer -= 1/60;
-                    }
+                    } else this.attackTimer -= 1/60;
                     for(let i=0;i<this.projectiles.length;i++) {
                         let p=this.projectiles[i];
                         p.x+=p.vx; p.y+=p.vy;
@@ -412,8 +402,7 @@
                 }
                 takeDamage(amount) {
                     this.hp -= amount;
-                    if(this.hp<=0) return true;
-                    return false;
+                    return this.hp <= 0;
                 }
             }
             
@@ -425,7 +414,7 @@
             
             // ---------- ПРЕДМЕТЫ ОРУЖИЯ ----------
             let weaponItems = [];
-            function spawnWeaponItem(x,y,weaponIdx) { weaponItems.push({ x,y, w:28, h:28, weaponIdx }); }
+            function spawnWeaponItem(x,y,idx) { weaponItems.push({ x,y, w:28, h:28, weaponIdx:idx }); }
             function scatterWeapons() {
                 for(let i=0;i<weaponsList.length;i++) {
                     let placed=false;
@@ -461,167 +450,199 @@
             let decorations=[];
             for(let i=0;i<180;i++) decorations.push({ x:Math.random()*WORLD_WIDTH, y:Math.random()*WORLD_HEIGHT, type:0 });
             
-            // ---------- УПРАВЛЕНИЕ: ДВИЖЕНИЕ (левый div) ----------
-            let moveVec={x:0,y:0}, moveActive=false;
-            const moveBase=document.querySelector('#joystickContainer .joystick-base');
-            const moveThumb=document.getElementById('joystickThumb');
-            function updateMove(e){
+            // ---------- УПРАВЛЕНИЕ (движение) ----------
+            let moveVec = {x:0, y:0};
+            let moveActive = false;
+            const moveThumb = document.getElementById('joystickThumb');
+            const moveBase = document.querySelector('#moveZone .joystick-base');
+            function updateMove(e) {
                 if(!moveActive) return;
-                const touch=e.touches?e.touches[0]:e;
-                const rect=moveBase.getBoundingClientRect();
-                let dx=touch.clientX - (rect.left+rect.width/2);
-                let dy=touch.clientY - (rect.top+rect.height/2);
-                const maxDist=rect.width/2;
-                let dist=Math.hypot(dx,dy);
-                if(dist>maxDist){ dx=dx/dist*maxDist; dy=dy/dist*maxDist; }
-                moveThumb.style.transform=`translate(${dx}px, ${dy}px)`;
-                moveVec.x=dx/maxDist; moveVec.y=dy/maxDist;
+                const touch = e.touches ? e.touches[0] : e;
+                const rect = moveBase.getBoundingClientRect();
+                let dx = touch.clientX - (rect.left + rect.width/2);
+                let dy = touch.clientY - (rect.top + rect.height/2);
+                const maxDist = rect.width/2;
+                let dist = Math.hypot(dx,dy);
+                if(dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
+                moveThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+                moveVec.x = dx / maxDist;
+                moveVec.y = dy / maxDist;
             }
-            function startMove(e){ e.preventDefault(); moveActive=true; updateMove(e); }
-            function endMove(){ moveActive=false; moveVec={x:0,y:0}; moveThumb.style.transform='translate(0px,0px)'; }
+            function startMove(e) { e.preventDefault(); moveActive=true; updateMove(e); }
+            function endMove() { moveActive=false; moveVec={x:0,y:0}; moveThumb.style.transform='translate(0px,0px)'; }
             const moveZone = document.getElementById('moveZone');
             moveZone.addEventListener('touchstart', startMove);
-            window.addEventListener('touchmove', (e)=>{ if(moveActive){ e.preventDefault(); updateMove(e); } });
+            window.addEventListener('touchmove', (e)=>{ if(moveActive) { e.preventDefault(); updateMove(e); } });
             window.addEventListener('touchend', endMove);
-            moveZone.addEventListener('mousedown', (e)=>{ e.preventDefault(); moveActive=true; updateMove(e); window.addEventListener('mousemove', onMoveMove); window.addEventListener('mouseup', onMoveUp); });
-            function onMoveMove(e){ if(moveActive) updateMove(e); }
-            function onMoveUp(){ endMove(); window.removeEventListener('mousemove',onMoveMove); window.removeEventListener('mouseup',onMoveUp); }
+            moveZone.addEventListener('mousedown', startMove);
+            window.addEventListener('mousemove', (e)=>{ if(moveActive) updateMove(e); });
+            window.addEventListener('mouseup', endMove);
             
-            // ---------- УПРАВЛЕНИЕ: АТАКА (правый div) ----------
+            // ---------- УПРАВЛЕНИЕ (атака) ----------
             let aiming = false;
-            let aimDirection = { x:1, y:0 };
-            let aimStartX = 0, aimStartY = 0;
+            let aimDir = { x:1, y:0 };
+            let aimStart = { x:0, y:0 };
             const aimDot = document.getElementById('aimDot');
             const attackZone = document.getElementById('attackZone');
-            
-            function handleAimStart(e) {
+            function startAim(e) {
                 e.preventDefault();
-                let clientX, clientY;
-                if(e.touches) { clientX=e.touches[0].clientX; clientY=e.touches[0].clientY; }
-                else { clientX=e.clientX; clientY=e.clientY; }
+                const touch = e.touches ? e.touches[0] : e;
                 aiming = true;
-                aimStartX = clientX;
-                aimStartY = clientY;
-                aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
+                aimStart.x = touch.clientX;
+                aimStart.y = touch.clientY;
+                aimDir = { x: player.dirX || 1, y: player.dirY || 0 };
                 aimDot.style.display = 'block';
-                aimDot.style.left = clientX + 'px';
-                aimDot.style.top = clientY + 'px';
+                aimDot.style.left = touch.clientX + 'px';
+                aimDot.style.top = touch.clientY + 'px';
             }
-            
-            function handleAimMove(e) {
+            function moveAim(e) {
                 if(!aiming) return;
                 e.preventDefault();
-                let clientX, clientY;
-                if(e.touches) { clientX=e.touches[0].clientX; clientY=e.touches[0].clientY; }
-                else { clientX=e.clientX; clientY=e.clientY; }
-                let dx = clientX - aimStartX;
-                let dy = clientY - aimStartY;
-                let len = Math.hypot(dx, dy);
+                const touch = e.touches ? e.touches[0] : e;
+                let dx = touch.clientX - aimStart.x;
+                let dy = touch.clientY - aimStart.y;
+                let len = Math.hypot(dx,dy);
                 if(len > 10) {
-                    aimDirection.x = dx / len;
-                    aimDirection.y = dy / len;
+                    aimDir.x = dx/len;
+                    aimDir.y = dy/len;
                 } else {
-                    aimDirection = { x: player.dirX || 1, y: player.dirY || 0 };
+                    aimDir = { x: player.dirX || 1, y: player.dirY || 0 };
                 }
-                aimDot.style.left = clientX + 'px';
-                aimDot.style.top = clientY + 'px';
+                aimDot.style.left = touch.clientX + 'px';
+                aimDot.style.top = touch.clientY + 'px';
             }
-            
-            function handleAimEnd(e) {
+            function endAim(e) {
                 if(!aiming) return;
                 e.preventDefault();
                 aiming = false;
                 aimDot.style.display = 'none';
                 if(currentWeapon.attackCooldown <= 0) {
-                    executeAttack(aimDirection);
+                    executeAttack(aimDir);
                 }
             }
+            attackZone.addEventListener('touchstart', startAim);
+            attackZone.addEventListener('touchmove', moveAim);
+            attackZone.addEventListener('touchend', endAim);
+            attackZone.addEventListener('mousedown', startAim);
+            attackZone.addEventListener('mousemove', (e)=>{ if(aiming) moveAim(e); });
+            attackZone.addEventListener('mouseup', endAim);
             
-            attackZone.addEventListener('touchstart', handleAimStart);
-            attackZone.addEventListener('touchmove', handleAimMove);
-            attackZone.addEventListener('touchend', handleAimEnd);
-            attackZone.addEventListener('mousedown', handleAimStart);
-            attackZone.addEventListener('mousemove', (e) => { if(aiming) handleAimMove(e); });
-            attackZone.addEventListener('mouseup', handleAimEnd);
-            
-            // Для ПК также клик в правой зоне без зажатия (быстрый выстрел)
+            // Быстрая атака кликом на ПК
             attackZone.addEventListener('click', (e) => {
                 if(window.innerWidth > 768 && currentWeapon.attackCooldown <= 0) {
                     let rect = attackZone.getBoundingClientRect();
                     let clickX = e.clientX;
                     let clickY = e.clientY;
-                    // направление от игрока к месту клика в мировых координатах (приблизительно)
-                    let playerScreenX = player.x - camera.x + PLAYER_W/2;
-                    let playerScreenY = player.y - camera.y + PLAYER_H/2;
-                    let dx = (clickX - (playerScreenX + camera.x - (player.x - camera.x)?) - упростим: 
-                    // проще взять направление от игрока к точке клика на экране, но пересчёт в мировые не нужен для направления
                     let centerX = player.x - camera.x + PLAYER_W/2;
                     let centerY = player.y - camera.y + PLAYER_H/2;
-                    let dirX = clickX - centerX;
-                    let dirY = clickY - centerY;
-                    let len = Math.hypot(dirX, dirY);
-                    if(len>0.01) { dirX/=len; dirY/=len; } else { dirX=1; dirY=0; }
-                    executeAttack({x:dirX, y:dirY});
+                    let dx = clickX - centerX;
+                    let dy = clickY - centerY;
+                    let len = Math.hypot(dx,dy);
+                    if(len>0.01) { dx/=len; dy/=len; } else { dx=1; dy=0; }
+                    executeAttack({x:dx, y:dy});
                 }
             });
             
             function executeAttack(dir) {
-                if(currentWeapon.attackCooldown>0) return;
+                if(currentWeapon.attackCooldown > 0) return;
                 if(currentWeapon.type === WeaponType.MELEE) {
-                    let attackX = player.x+PLAYER_W/2;
-                    let attackY = player.y+PLAYER_H/2;
+                    let ax = player.x + PLAYER_W/2;
+                    let ay = player.y + PLAYER_H/2;
                     let hit = false;
                     for(let i=0;i<enemies.length;i++) {
-                        let e=enemies[i];
-                        let ecx=e.x+e.w/2, ecy=e.y+e.h/2;
-                        if(Math.hypot(attackX-ecx, attackY-ecy) < currentWeapon.range) {
+                        let e = enemies[i];
+                        let ex = e.x + e.w/2, ey = e.y + e.h/2;
+                        if(Math.hypot(ax-ex, ay-ey) < currentWeapon.range) {
                             e.hp -= currentWeapon.damage;
-                            hit=true;
-                            if(e.hp<=0) { enemies.splice(i,1); player.kills++; document.getElementById('kills').innerText=player.kills; i--; }
+                            hit = true;
+                            if(e.hp <= 0) {
+                                enemies.splice(i,1);
+                                player.kills++;
+                                document.getElementById('kills').innerText = player.kills;
+                                i--;
+                            }
                         }
                     }
-                    if(boss && Math.hypot(attackX-(boss.x+boss.w/2), attackY-(boss.y+boss.h/2)) < currentWeapon.range+15) {
-                        let dead=boss.takeDamage(currentWeapon.damage);
+                    if(boss && Math.hypot(ax - (boss.x+boss.w/2), ay - (boss.y+boss.h/2)) < currentWeapon.range+15) {
+                        let dead = boss.takeDamage(currentWeapon.damage);
                         if(dead) { boss=null; document.getElementById('bossHealthBar').style.display='none'; }
-                        hit=true;
+                        hit = true;
                     }
                     if(hit) {
-                        meleeSwing.active=true; meleeSwing.timer=meleeSwing.duration;
-                        meleeSwing.angle=Math.atan2(dir.y, dir.x);
-                        meleeSwing.x=player.x+PLAYER_W/2; meleeSwing.y=player.y+PLAYER_H/2;
+                        meleeSwing.active = true;
+                        meleeSwing.timer = meleeSwing.duration;
+                        meleeSwing.angle = Math.atan2(dir.y, dir.x);
+                        meleeSwing.x = player.x + PLAYER_W/2;
+                        meleeSwing.y = player.y + PLAYER_H/2;
                     }
                 } else {
-                    let startX=player.x+PLAYER_W/2, startY=player.y+PLAYER_H/2;
                     projectiles.push({
-                        x:startX, y:startY,
-                        vx:dir.x*currentWeapon.projectileSpeed, vy:dir.y*currentWeapon.projectileSpeed,
-                        damage:currentWeapon.damage, traveled:0, range:currentWeapon.range,
-                        size:8, color:currentWeapon.color
+                        x: player.x + PLAYER_W/2, y: player.y + PLAYER_H/2,
+                        vx: dir.x * currentWeapon.projectileSpeed,
+                        vy: dir.y * currentWeapon.projectileSpeed,
+                        damage: currentWeapon.damage,
+                        traveled: 0, range: currentWeapon.range,
+                        size: 8, color: currentWeapon.color
                     });
                 }
-                currentWeapon.attackCooldown=currentWeapon.attackDelay;
+                currentWeapon.attackCooldown = currentWeapon.attackDelay;
             }
             
+            // ---------- КЛАВИАТУРА (движение) ----------
+            const keys = { w:false, s:false, a:false, d:false, ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+            window.addEventListener('keydown', (e) => {
+                let k = e.key;
+                if(keys.hasOwnProperty(k)) { keys[k]=true; e.preventDefault(); }
+                if(k===' '||k==='Space') { e.preventDefault(); if(currentWeapon.attackCooldown<=0) executeAttack({x:player.dirX||1, y:player.dirY||0}); }
+            });
+            window.addEventListener('keyup', (e) => {
+                let k = e.key;
+                if(keys.hasOwnProperty(k)) keys[k]=false;
+            });
+            
             // ---------- ОБНОВЛЕНИЯ ----------
+            function updateMovement() {
+                let mx = 0, my = 0;
+                if(keys.w || keys.ArrowUp) my -= 1;
+                if(keys.s || keys.ArrowDown) my += 1;
+                if(keys.a || keys.ArrowLeft) mx -= 1;
+                if(keys.d || keys.ArrowRight) mx += 1;
+                if(moveVec.x !== 0 || moveVec.y !== 0) { mx += moveVec.x; my += moveVec.y; }
+                let len = Math.hypot(mx, my);
+                if(len > 0) { mx /= len; my /= len; }
+                if(mx !== 0 || my !== 0) { player.dirX = mx; player.dirY = my; player.animTime += 0.2; } else player.animTime = 0;
+                let newX = player.x + mx * MOVE_SPEED;
+                let newY = player.y + my * MOVE_SPEED;
+                if(!collision(newX, player.y, PLAYER_W, PLAYER_H)) player.x = newX;
+                if(!collision(player.x, newY, PLAYER_W, PLAYER_H)) player.y = newY;
+            }
+            function collision(x,y,w,h) {
+                if(x<0 || y<0 || x+w>WORLD_WIDTH || y+h>WORLD_HEIGHT) return true;
+                for(let wa of walls) if(x<wa.x+wa.w && x+w>wa.x && y<wa.y+wa.h && y+h>wa.y) return true;
+                return false;
+            }
+            
             function updateProjectiles() {
                 for(let i=0;i<projectiles.length;i++) {
-                    let p=projectiles[i];
-                    p.x+=p.vx; p.y+=p.vy;
-                    p.traveled+=Math.hypot(p.vx,p.vy);
-                    let hit=false;
+                    let p = projectiles[i];
+                    p.x += p.vx; p.y += p.vy;
+                    p.traveled += Math.hypot(p.vx, p.vy);
+                    let hit = false;
                     for(let w of walls) if(p.x>w.x && p.x<w.x+w.w && p.y>w.y && p.y<w.y+w.h) { hit=true; break; }
-                    if(p.traveled>p.range || hit || p.x<0 || p.x>WORLD_WIDTH || p.y<0 || p.y>WORLD_HEIGHT) { projectiles.splice(i,1); i--; continue; }
+                    if(p.traveled>p.range || hit || p.x<0 || p.x>WORLD_WIDTH || p.y<0 || p.y>WORLD_HEIGHT) {
+                        projectiles.splice(i,1); i--; continue;
+                    }
                     for(let j=0;j<enemies.length;j++) {
-                        let e=enemies[j];
+                        let e = enemies[j];
                         if(p.x>e.x && p.x<e.x+e.w && p.y>e.y && p.y<e.y+e.h) {
-                            e.hp-=p.damage;
+                            e.hp -= p.damage;
                             projectiles.splice(i,1);
                             if(e.hp<=0) { enemies.splice(j,1); player.kills++; document.getElementById('kills').innerText=player.kills; j--; }
                             break;
                         }
                     }
                     if(boss && p.x>boss.x && p.x<boss.x+boss.w && p.y>boss.y && p.y<boss.y+boss.h) {
-                        let dead=boss.takeDamage(p.damage);
+                        let dead = boss.takeDamage(p.damage);
                         projectiles.splice(i,1);
                         if(dead) { boss=null; document.getElementById('bossHealthBar').style.display='none'; }
                     }
@@ -629,77 +650,39 @@
             }
             
             function updateCooldowns(delta) {
-                if(currentWeapon.attackCooldown>0) {
-                    currentWeapon.attackCooldown-=delta;
-                    let fill=1-currentWeapon.attackCooldown/currentWeapon.attackDelay;
-                    document.getElementById('reloadFill').style.width=(fill*100)+'%';
-                } else document.getElementById('reloadFill').style.width='100%';
+                if(currentWeapon.attackCooldown > 0) {
+                    currentWeapon.attackCooldown -= delta;
+                    let fill = 1 - currentWeapon.attackCooldown/currentWeapon.attackDelay;
+                    document.getElementById('reloadFill').style.width = (fill*100)+'%';
+                } else document.getElementById('reloadFill').style.width = '100%';
                 if(meleeSwing.active) {
-                    meleeSwing.timer-=delta;
-                    if(meleeSwing.timer<=0) meleeSwing.active=false;
+                    meleeSwing.timer -= delta;
+                    if(meleeSwing.timer <= 0) meleeSwing.active = false;
                 }
-                if(player.invincibleTimer>0) player.invincibleTimer-=delta;
-                if(player.hp>player.maxHp) player.hp=player.maxHp;
-                document.getElementById('hpValue').innerText=Math.floor(player.hp);
+                if(player.invincibleTimer > 0) player.invincibleTimer -= delta;
+                if(player.hp > player.maxHp) player.hp = player.maxHp;
+                document.getElementById('hpValue').innerText = Math.floor(player.hp);
             }
             
             function checkWeaponPickup() {
                 for(let i=0;i<weaponItems.length;i++) {
-                    let it=weaponItems[i];
-                    if(Math.abs(player.x-it.x)<45 && Math.abs(player.y-it.y)<45) {
-                        let newW=weaponsList[it.weaponIdx];
-                        currentWeapon={...newW, attackCooldown:0};
-                        document.getElementById('weaponInfo').innerHTML=`${newW.emoji} ${newW.name} (урон ${newW.damage})`;
+                    let it = weaponItems[i];
+                    if(Math.abs(player.x - it.x) < 45 && Math.abs(player.y - it.y) < 45) {
+                        let newW = weaponsList[it.weaponIdx];
+                        currentWeapon = { ...newW, attackCooldown: 0 };
+                        document.getElementById('weaponInfo').innerHTML = `${newW.emoji} ${newW.name} (урон ${newW.damage})`;
                         weaponItems.splice(i,1); break;
                     }
                 }
             }
             
-            function updateMovement() {
-                let moveX=0, moveY=0;
-                if(keys.ArrowUp||keys.w) moveY-=1;
-                if(keys.ArrowDown||keys.s) moveY+=1;
-                if(keys.ArrowLeft||keys.a) moveX-=1;
-                if(keys.ArrowRight||keys.d) moveX+=1;
-                if(moveVec.x!==0 || moveVec.y!==0) { moveX+=moveVec.x; moveY+=moveVec.y; }
-                let len=Math.hypot(moveX,moveY);
-                if(len>0) { moveX/=len; moveY/=len; }
-                if(moveX!==0||moveY!==0) { player.dirX=moveX; player.dirY=moveY; player.animTime+=0.2; } else player.animTime=0;
-                let newX=player.x+moveX*MOVE_SPEED;
-                if(!collision(newX, player.y, PLAYER_W, PLAYER_H)) player.x=newX;
-                let newY=player.y+moveY*MOVE_SPEED;
-                if(!collision(player.x, newY, PLAYER_W, PLAYER_H)) player.y=newY;
-            }
-            
-            function collision(x,y,w,h){
-                if(x<0||y<0||x+w>WORLD_WIDTH||y+h>WORLD_HEIGHT) return true;
-                for(let wa of walls) if(x<wa.x+wa.w && x+w>wa.x && y<wa.y+wa.h && y+h>wa.y) return true;
-                return false;
-            }
-            
-            const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false };
-            window.addEventListener('keydown', (e)=>{
-                let k=e.key;
-                if(keys.hasOwnProperty(k)) { keys[k]=true; e.preventDefault(); }
-                if(k==='w'||k==='W') keys.w=true;
-                if(k==='s'||k==='S') keys.s=true;
-                if(k==='a'||k==='A') keys.a=true;
-                if(k==='d'||k==='D') keys.d=true;
-            });
-            window.addEventListener('keyup', (e)=>{
-                let k=e.key;
-                if(keys.hasOwnProperty(k)) keys[k]=false;
-                if(k==='w'||k==='W') keys.w=false;
-                if(k==='s'||k==='S') keys.s=false;
-                if(k==='a'||k==='A') keys.a=false;
-                if(k==='d'||k==='D') keys.d=false;
-            });
-            
-            let camera={x:0,y:0};
-            function updateCamera(){
-                let tx=player.x+PLAYER_W/2-CANVAS_W/2, ty=player.y+PLAYER_H/2-CANVAS_H/2;
-                camera.x=Math.min(Math.max(0,tx), WORLD_WIDTH-CANVAS_W);
-                camera.y=Math.min(Math.max(0,ty), WORLD_HEIGHT-CANVAS_H);
+            function updateEnemySpawning(delta) {
+                if(boss) return;
+                enemySpawnTimer += delta;
+                if(enemySpawnTimer > 8 && enemies.length < 6) {
+                    enemySpawnTimer = 0;
+                    spawnRandomEnemy();
+                }
             }
             
             function checkBossSpawn() {
@@ -707,56 +690,44 @@
                 if(boss) boss.update();
             }
             
-            function updateEnemySpawning(delta) {
-                if(boss) return;
-                enemySpawnTimer += delta;
-                if(enemySpawnTimer > 8.0 && enemies.length < 6) {
-                    enemySpawnTimer = 0;
-                    spawnRandomEnemy();
-                }
+            let camera = { x:0, y:0 };
+            function updateCamera() {
+                let tx = player.x + PLAYER_W/2 - CANVAS_W/2;
+                let ty = player.y + PLAYER_H/2 - CANVAS_H/2;
+                camera.x = Math.min(Math.max(0, tx), WORLD_WIDTH - CANVAS_W);
+                camera.y = Math.min(Math.max(0, ty), WORLD_HEIGHT - CANVAS_H);
             }
             
-            // ---------- СМЕРТЬ И ВОЗРОЖДЕНИЕ ----------
+            // ---------- СМЕРТЬ ----------
             let gameActive = true;
             function showDeathScreen() {
                 if(!gameActive) return;
                 gameActive = false;
                 const overlay = document.createElement('div');
                 overlay.className = 'death-overlay';
-                overlay.innerHTML = `
-                    <div class="death-window">
-                        <h2>💀 ВЫ ПОГИБЛИ 💀</h2>
-                        <p>Вы прошли путь, но силы иссякли...</p>
-                        <button id="restartButton">Возродиться</button>
-                    </div>
-                `;
+                overlay.innerHTML = `<div class="death-window"><h2>💀 ВЫ ПОГИБЛИ 💀</h2><button id="restartBtn">Возродиться</button></div>`;
                 document.body.appendChild(overlay);
-                document.getElementById('restartButton').addEventListener('click', () => {
-                    location.reload();
-                });
+                document.getElementById('restartBtn').addEventListener('click', () => location.reload());
             }
-            
             function checkPlayerDeath() {
-                if(gameActive && player.hp <= 0) {
-                    showDeathScreen();
-                }
+                if(gameActive && player.hp <= 0) showDeathScreen();
             }
             
             // ---------- ОТРИСОВКА ----------
             function drawGround() {
-                let grad=ctx.createLinearGradient(0,CANVAS_H,0,0);
-                grad.addColorStop(0,'#5d9652'); grad.addColorStop(1,'#2b522c');
-                ctx.fillStyle=grad; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+                let grad = ctx.createLinearGradient(0, CANVAS_H, 0, 0);
+                grad.addColorStop(0, '#5d9652'); grad.addColorStop(1, '#2b522c');
+                ctx.fillStyle = grad; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
                 for(let i=0;i<700;i++) {
-                    let wx=(i*311)%WORLD_WIDTH, wy=(i*457)%WORLD_HEIGHT;
-                    let sx=wx-camera.x, sy=wy-camera.y;
-                    if(sx>0&&sx<CANVAS_W&&sy>0&&sy<CANVAS_H){
-                        ctx.fillStyle=`rgba(210,240,120,0.25)`;
+                    let wx = (i*311)%WORLD_WIDTH, wy = (i*457)%WORLD_HEIGHT;
+                    let sx = wx-camera.x, sy = wy-camera.y;
+                    if(sx>0 && sx<CANVAS_W && sy>0 && sy<CANVAS_H) {
+                        ctx.fillStyle = `rgba(210,240,120,0.25)`;
                         ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill();
                     }
                 }
             }
-            function drawWall(w){
+            function drawWall(w) {
                 let x=w.x-camera.x, y=w.y-camera.y;
                 if(x+w.w<0||x>CANVAS_W||y+w.h<0||y>CANVAS_H) return;
                 ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x+w.w/2+2, y+w.h-3, w.w/2+4,8,0,0,Math.PI*2); ctx.fill();
@@ -764,8 +735,8 @@
                 ctx.fillStyle='#b39d6b'; ctx.beginPath(); ctx.moveTo(x,y+22); ctx.lineTo(x+w.w,y+22); ctx.lineTo(x+w.w-5,y); ctx.lineTo(x+5,y); ctx.fill();
                 ctx.fillStyle='#473d28'; ctx.fillRect(x+w.w-6, y+20, 6, w.h);
             }
-            function drawDecor(d){ let x=d.x-camera.x,y=d.y-camera.y; if(x>-50&&x<CANVAS_W+50&&y>-50&&y<CANVAS_H+50) ctx.fillStyle='#4c7a3a',ctx.beginPath(),ctx.ellipse(x,y-4,12,8,0,0,Math.PI*2),ctx.fill(); }
-            function drawPlayer(){
+            function drawDecor(d) { let x=d.x-camera.x,y=d.y-camera.y; if(x>-50&&x<CANVAS_W+50&&y>-50&&y<CANVAS_H+50) ctx.fillStyle='#4c7a3a',ctx.beginPath(),ctx.ellipse(x,y-4,12,8,0,0,Math.PI*2),ctx.fill(); }
+            function drawPlayer() {
                 let px=player.x-camera.x, py=player.y-camera.y, cx=px+PLAYER_W/2, cy=py+PLAYER_H/2;
                 ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(cx+4, cy+7, 22,11,0,0,Math.PI*2); ctx.fill();
                 let step=Math.sin(player.animTime*Math.PI)*2;
@@ -786,7 +757,7 @@
                     ctx.strokeStyle='#ffaa33'; ctx.lineWidth=3; ctx.stroke();
                 }
             }
-            function drawWeaponItems(){
+            function drawWeaponItems() {
                 for(let it of weaponItems){
                     let x=it.x-camera.x, y=it.y-camera.y;
                     if(x<-20||x>CANVAS_W+20) continue;
@@ -795,21 +766,21 @@
                     ctx.fillStyle='#ffdd99'; ctx.font='bold 20px monospace'; ctx.fillText(weaponsList[it.weaponIdx].emoji, x+6, y+22);
                 }
             }
-            function drawProjectiles(){ for(let p of projectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size/1.5,0,Math.PI*2); ctx.fill(); } }
-            function drawAimLine(){
+            function drawProjectiles() { for(let p of projectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size/1.5,0,Math.PI*2); ctx.fill(); } }
+            function drawAimLine() {
                 if(!aiming) return;
-                let startX=player.x-camera.x+PLAYER_W/2, startY=player.y-camera.y+PLAYER_H/2;
-                let endX=startX+aimDirection.x*60, endY=startY+aimDirection.y*60;
-                ctx.beginPath(); ctx.moveTo(startX,startY); ctx.lineTo(endX,endY);
+                let sx=player.x-camera.x+PLAYER_W/2, sy=player.y-camera.y+PLAYER_H/2;
+                let ex=sx+aimDir.x*60, ey=sy+aimDir.y*60;
+                ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey);
                 ctx.strokeStyle='#ffcc88'; ctx.lineWidth=3; ctx.stroke();
-                ctx.beginPath(); ctx.arc(endX,endY,8,0,Math.PI*2); ctx.fillStyle='#ffaa55aa'; ctx.fill();
+                ctx.beginPath(); ctx.arc(ex,ey,8,0,Math.PI*2); ctx.fillStyle='#ffaa55aa'; ctx.fill();
             }
             
-            let lastTime=0;
-            function render(now){
+            let lastTime = 0;
+            function render(now) {
                 if(!gameActive) return;
-                let delta=Math.min(0.033, (now-lastTime)/1000);
-                if(delta>0){
+                let delta = Math.min(0.033, (now - lastTime)/1000);
+                if(delta > 0) {
                     updateCooldowns(delta);
                     updateProjectiles();
                     for(let e of enemies) e.update();
@@ -819,27 +790,25 @@
                     checkBossSpawn();
                     checkPlayerDeath();
                 }
-                lastTime=now;
+                lastTime = now;
                 updateCamera();
                 drawGround();
                 for(let w of walls) drawWall(w);
                 for(let d of decorations) drawDecor(d);
                 drawWeaponItems();
-                for(let e of enemies) e.draw(ctx,camera);
-                if(boss) boss.draw(ctx,camera);
+                for(let e of enemies) e.draw(ctx, camera);
+                if(boss) boss.draw(ctx, camera);
                 drawProjectiles();
                 drawPlayer();
                 drawAimLine();
-                ctx.fillStyle='#c0e0a020'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+                ctx.fillStyle = '#c0e0a020'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
                 requestAnimationFrame(render);
             }
             
-            function init() {
-                scatterWeapons();
-                for(let i=0;i<6;i++) spawnRandomEnemy();
-                render(performance.now());
-            }
-            init();
+            // ИНИЦИАЛИЗАЦИЯ
+            scatterWeapons();
+            for(let i=0;i<6;i++) spawnRandomEnemy();
+            render(performance.now());
         })();
     </script>
 </body>
