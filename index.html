@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс-мечник (исправлен)</title>
+    <title>2.5D Adventure - Агрессивный босс-мечник</title>
     <style>
         * {
             margin: 0;
@@ -211,7 +211,7 @@
             let walls = [];
             let decor = [];
             
-            // --- НОВЫЙ БОСС (МЕЧНИК) ---
+            // --- БОСС ---
             let boss = null;
             let bossDefeated = false;
             
@@ -230,7 +230,7 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            // ---------- ВРАГ ----------
+            // ---------- ВРАГ (без дельты, как работало раньше) ----------
             class Enemy {
                 constructor(x, y, type="normal") {
                     this.x = x; this.y = y; this.w = 32; this.h = 32;
@@ -245,20 +245,23 @@
                     this.attackTimer = 0;
                 }
                 update(delta) {
+                    // Движение без умножения на delta (как в оригинале)
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
                     if(len > 0.1) {
                         dx /= len; dy /= len;
-                        this.x += dx * this.speed * delta;
-                        this.y += dy * this.speed * delta;
+                        this.x += dx * this.speed;
+                        this.y += dy * this.speed;
                     }
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
                     if(this.attackTimer <= 0 && Math.hypot(this.x+this.w/2 - (player.x+PLAYER_W/2), this.y+this.h/2 - (player.y+PLAYER_H/2)) < 40) {
-                        player.hp -= 12;
-                        player.invTimer = 0.7;
+                        if (player.invTimer <= 0) {
+                            player.hp -= 12;
+                            player.invTimer = 0.7;
+                        }
                         this.attackTimer = 0.8;
                     }
                     if(this.attackTimer > 0) this.attackTimer -= delta;
@@ -291,7 +294,7 @@
                 }
             }
             
-            // ---------- ИСПРАВЛЕННЫЙ БОСС: МЕЧНИК (ДВИГАЕТСЯ С УЧЁТОМ DELTA) ----------
+            // ---------- АГРЕССИВНЫЙ БОСС (исправленное движение и атака) ----------
             class BossSwordsman {
                 constructor(x, y) {
                     this.x = x;
@@ -301,10 +304,10 @@
                     this.hp = 480;
                     this.maxHp = 480;
                     this.phase = 1;
-                    this.speed = 140;        // пикселей в секунду (было 1.35 без дельты)
+                    this.speed = 3.6;       // пикселей за кадр (при 60fps ~216 в секунду)
                     this.attackCd = 0;
-                    this.attackDelay = 1.3;
-                    this.attackRadius = 86;
+                    this.attackDelay = 1.0;  // атака каждую секунду
+                    this.attackRadius = 95;
                     this.attackDamage = 32;
                     this.swingActive = false;
                     this.swingTimer = 0;
@@ -312,32 +315,20 @@
                 }
                 
                 update(delta) {
-                    if (!delta || delta > 0.1) delta = 0.016;
-                    
-                    // Движение к игроку с учётом дельты
+                    // Движение к игроку (без лишних коллизий)
                     const dx = (player.x + PLAYER_W/2) - (this.x + this.w/2);
                     const dy = (player.y + PLAYER_H/2) - (this.y + this.h/2);
                     const len = Math.hypot(dx, dy);
-                    if (len > 0.01) {
-                        let moveX = (dx / len) * this.speed * delta;
-                        let moveY = (dy / len) * this.speed * delta;
+                    if (len > 0.5) {
+                        let moveX = (dx / len) * this.speed;
+                        let moveY = (dy / len) * this.speed;
                         this.x += moveX;
                         this.y += moveY;
                     }
                     
-                    // Коллизия со стенами (чтобы не застревал)
-                    this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
-                    this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
-                    // Дополнительная проверка на стены (отталкивание от стен)
-                    for (let w of walls) {
-                        if (this.x < w.x + w.w && this.x + this.w > w.x && this.y < w.y + w.h && this.y + this.h > w.y) {
-                            // Простое отталкивание
-                            if (this.x + this.w/2 < w.x + w.w/2) this.x = w.x - this.w;
-                            else this.x = w.x + w.w;
-                            if (this.y + this.h/2 < w.y + w.h/2) this.y = w.y - this.h;
-                            else this.y = w.y + w.h;
-                        }
-                    }
+                    // Ограничение по миру и простейшее избегание стен
+                    this.x = Math.min(Math.max(this.x, 20), WORLD_W - this.w - 20);
+                    this.y = Math.min(Math.max(this.y, 20), WORLD_H - this.h - 20);
                     
                     // Атака (круговая)
                     if (this.attackCd <= 0) {
@@ -345,9 +336,9 @@
                             (player.x + PLAYER_W/2) - (this.x + this.w/2),
                             (player.y + PLAYER_H/2) - (this.y + this.h/2)
                         );
-                        if (distToPlayer < this.attackRadius + 25) {
+                        if (distToPlayer < this.attackRadius + 20) {
                             this.performSwordAttack();
-                            const baseDelay = (this.phase === 1) ? 1.3 : 0.85;
+                            const baseDelay = (this.phase === 1) ? 1.0 : 0.7;
                             this.attackCd = baseDelay;
                         }
                     } else {
@@ -363,12 +354,12 @@
                     // Смена фазы при 50% HP
                     if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
                         this.phase = 2;
-                        this.speed = 210;
-                        for (let i = 0; i < 30; i++) {
+                        this.speed = 5.2;
+                        for (let i = 0; i < 35; i++) {
                             particles.push({
                                 x: this.x + this.w/2, y: this.y + this.h/2,
-                                life: 0.6, vx: (Math.random() - 0.5) * 8,
-                                vy: (Math.random() - 0.5) * 8, color: "#ff6644"
+                                life: 0.6, vx: (Math.random() - 0.5) * 9,
+                                vy: (Math.random() - 0.5) * 9, color: "#ff6644"
                             });
                         }
                     }
@@ -383,14 +374,14 @@
                     
                     if (distToPlayer < this.attackRadius && player.invTimer <= 0) {
                         player.hp -= this.attackDamage;
-                        player.invTimer = 0.55;
-                        for (let i = 0; i < 14; i++) {
+                        player.invTimer = 0.6;
+                        for (let i = 0; i < 16; i++) {
                             particles.push({
-                                x: playerCenterX + (Math.random() - 0.5) * 24,
-                                y: playerCenterY + (Math.random() - 0.5) * 24,
-                                life: 0.3,
-                                vx: (Math.random() - 0.5) * 5,
-                                vy: (Math.random() - 0.5) * 5,
+                                x: playerCenterX + (Math.random() - 0.5) * 28,
+                                y: playerCenterY + (Math.random() - 0.5) * 28,
+                                life: 0.35,
+                                vx: (Math.random() - 0.5) * 6,
+                                vy: (Math.random() - 0.5) * 6,
                                 color: "#ff6666"
                             });
                         }
@@ -399,16 +390,27 @@
                     this.swingActive = true;
                     this.swingTimer = this.swingDuration;
                     
-                    for (let i = 0; i < 28; i++) {
+                    for (let i = 0; i < 32; i++) {
                         const angle = Math.random() * Math.PI * 2;
                         const rad = this.attackRadius * 0.8;
                         particles.push({
                             x: centerX + Math.cos(angle) * rad,
                             y: centerY + Math.sin(angle) * rad,
-                            life: 0.25,
-                            vx: Math.cos(angle) * 2.5,
-                            vy: Math.sin(angle) * 2.5,
+                            life: 0.28,
+                            vx: Math.cos(angle) * 3,
+                            vy: Math.sin(angle) * 3,
                             color: "#ffaa66"
+                        });
+                    }
+                    // Дополнительные искры
+                    for (let i = 0; i < 12; i++) {
+                        particles.push({
+                            x: centerX + (Math.random() - 0.5) * this.attackRadius,
+                            y: centerY + (Math.random() - 0.5) * this.attackRadius,
+                            life: 0.2,
+                            vx: (Math.random() - 0.5) * 5,
+                            vy: (Math.random() - 0.5) * 5,
+                            color: "#ff8844"
                         });
                     }
                 }
@@ -449,23 +451,23 @@
                     
                     ctx.fillStyle = '#ff6600';
                     ctx.beginPath();
-                    ctx.arc(x + this.w*0.35, y + this.h*0.3, 6, 0, Math.PI*2);
+                    ctx.arc(x + this.w*0.35, y + this.h*0.3, 7, 0, Math.PI*2);
                     ctx.fill();
                     ctx.beginPath();
-                    ctx.arc(x + this.w*0.65, y + this.h*0.3, 6, 0, Math.PI*2);
+                    ctx.arc(x + this.w*0.65, y + this.h*0.3, 7, 0, Math.PI*2);
                     ctx.fill();
                     ctx.fillStyle = '#ffcc44';
                     ctx.beginPath();
-                    ctx.arc(x + this.w*0.35 - 1, y + this.h*0.3 - 1, 2.5, 0, Math.PI*2);
+                    ctx.arc(x + this.w*0.35 - 1, y + this.h*0.3 - 1, 2.8, 0, Math.PI*2);
                     ctx.fill();
                     ctx.beginPath();
-                    ctx.arc(x + this.w*0.65 - 1, y + this.h*0.3 - 1, 2.5, 0, Math.PI*2);
+                    ctx.arc(x + this.w*0.65 - 1, y + this.h*0.3 - 1, 2.8, 0, Math.PI*2);
                     ctx.fill();
                     
                     ctx.fillStyle = '#bbb';
-                    ctx.fillRect(x + this.w - 20, y + this.h*0.6, 28, 8);
+                    ctx.fillRect(x + this.w - 22, y + this.h*0.6, 30, 10);
                     ctx.fillStyle = '#eecc88';
-                    ctx.fillRect(x + this.w - 12, y + this.h*0.55, 16, 4);
+                    ctx.fillRect(x + this.w - 14, y + this.h*0.55, 18, 6);
                     
                     if (this.swingActive) {
                         const cx = x + this.w/2;
@@ -487,20 +489,20 @@
                     if (bossFill) bossFill.style.width = (pct * 100) + '%';
                     
                     if (this.phase === 2) {
-                        ctx.fillStyle = 'rgba(255,100,50,0.4)';
+                        ctx.fillStyle = 'rgba(255,100,50,0.5)';
                         ctx.fillRect(x, y, this.w, 8);
                     }
                 }
                 
                 takeDamage(amount) {
                     this.hp -= amount;
-                    for (let i = 0; i < 8; i++) {
+                    for (let i = 0; i < 10; i++) {
                         particles.push({
-                            x: this.x + this.w/2 + (Math.random() - 0.5) * 24,
-                            y: this.y + this.h/2 + (Math.random() - 0.5) * 24,
+                            x: this.x + this.w/2 + (Math.random() - 0.5) * 28,
+                            y: this.y + this.h/2 + (Math.random() - 0.5) * 28,
                             life: 0.25,
-                            vx: (Math.random() - 0.5) * 4,
-                            vy: (Math.random() - 0.5) * 4,
+                            vx: (Math.random() - 0.5) * 5,
+                            vy: (Math.random() - 0.5) * 5,
                             color: "#c44"
                         });
                     }
@@ -521,29 +523,30 @@
             function spawnEnemy() {
                 let types = ["normal", "fast", "tank"];
                 let type = types[Math.floor(Math.random()*types.length)];
-                let x = player.x + (Math.random()-0.5)*750;
-                let y = player.y + (Math.random()-0.5)*750;
+                let x = player.x + (Math.random()-0.5)*700;
+                let y = player.y + (Math.random()-0.5)*700;
                 x = Math.min(Math.max(x,80), WORLD_W-80);
                 y = Math.min(Math.max(y,80), WORLD_H-80);
-                if(Math.hypot(x-player.x, y-player.y) < 220) return;
+                if(Math.hypot(x-player.x, y-player.y) < 200) return;
                 enemies.push(new Enemy(x,y,type));
             }
             
             function spawnBoss() {
                 if (boss || bossDefeated) return;
-                let spawnX = player.x + (Math.random() - 0.5) * 500;
-                let spawnY = player.y + (Math.random() - 0.5) * 500;
+                let spawnX = player.x + (Math.random() - 0.5) * 400;
+                let spawnY = player.y + (Math.random() - 0.5) * 400;
                 spawnX = Math.min(Math.max(spawnX, 100), WORLD_W - 100);
                 spawnY = Math.min(Math.max(spawnY, 100), WORLD_H - 100);
                 boss = new BossSwordsman(spawnX, spawnY);
                 document.getElementById('bossBar').style.display = 'block';
-                for (let i = 0; i < 40; i++) {
+                for (let i = 0; i < 50; i++) {
                     particles.push({
                         x: spawnX + 38, y: spawnY + 38,
-                        life: 0.7, vx: (Math.random() - 0.5) * 9,
-                        vy: (Math.random() - 0.5) * 9, color: "#ff8844"
+                        life: 0.7, vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10, color: "#ff8844"
                     });
                 }
+                console.log("БОСС ПОЯВИЛСЯ!");
             }
             
             function spawnMedkit(x,y){ medkits.push({x,y, w:20, h:20}); }
@@ -617,7 +620,7 @@
                     if (boss && Math.hypot(ax - (boss.x+boss.w/2), ay - (boss.y+boss.h/2)) < weapon.range+25) {
                         let dead = boss.takeDamage(weapon.damage);
                         hit = true;
-                        for(let p=0;p<14;p++) particles.push({ x:boss.x+boss.w/2, y:boss.y+boss.h/2, life:0.4, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, color:"#f80" });
+                        for(let p=0;p<16;p++) particles.push({ x:boss.x+boss.w/2, y:boss.y+boss.h/2, life:0.4, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, color:"#f80" });
                         if(dead) { boss=null; bossDefeated=true; document.getElementById('bossBar').style.display='none'; }
                     }
                     if(hit) {
@@ -679,8 +682,8 @@
                 }
                 if(boss && boss.collidesWithPlayer()){
                     let angle = Math.atan2((player.y+PLAYER_H/2)-(boss.y+boss.h/2), (player.x+PLAYER_W/2)-(boss.x+boss.w/2));
-                    player.x += Math.cos(angle)*13;
-                    player.y += Math.sin(angle)*13;
+                    player.x += Math.cos(angle)*14;
+                    player.y += Math.sin(angle)*14;
                     player.x = Math.min(Math.max(player.x,0), WORLD_W-PLAYER_W);
                     player.y = Math.min(Math.max(player.y,0), WORLD_H-PLAYER_H);
                 }
