@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Приключение: Новое управление</title>
+    <title>2.5D Приключение: Раздельное управление</title>
     <style>
         * {
             margin: 0;
@@ -29,37 +29,7 @@
             cursor: crosshair;
             touch-action: none;
         }
-        /* Зоны управления (визуально не мешают, но для понимания) */
-        .control-zones {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 50%;
-            pointer-events: none;
-            z-index: 50;
-        }
-        .zone-left {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 50%;
-            height: 100%;
-            background: rgba(100, 200, 150, 0.1);
-            border-top-right-radius: 30px;
-            pointer-events: none;
-        }
-        .zone-right {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 50%;
-            height: 100%;
-            background: rgba(200, 100, 100, 0.1);
-            border-top-left-radius: 30px;
-            pointer-events: none;
-        }
-        /* Джойстик (отображается только в левой зоне) */
+        /* Джойстик движения (только левая нижняя четверть) */
         .joystick-container {
             position: fixed;
             bottom: 40px;
@@ -97,18 +67,19 @@
             touch-action: none;
             cursor: grab;
         }
-        /* Прицельная точка (визуально в правой зоне) */
+        /* Прицельная точка (отображается только при прицеливании) */
         .aim-dot {
             position: fixed;
-            width: 20px;
-            height: 20px;
-            background: rgba(255, 200, 100, 0.8);
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 200, 100, 0.9);
             border-radius: 50%;
             border: 2px solid white;
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 200;
             display: none;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
         /* Интерфейс */
         .ui {
@@ -192,21 +163,21 @@
             left: 0;
             right: 0;
             text-align: center;
-            color: #aaa;
-            font-size: 10px;
+            color: #ffefc0aa;
+            font-size: 11px;
             pointer-events: none;
             z-index: 100;
             background: rgba(0,0,0,0.4);
             padding: 4px;
+            border-radius: 20px;
+            width: fit-content;
+            margin: 0 auto;
+            backdrop-filter: blur(4px);
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div class="control-zones">
-        <div class="zone-left"></div>
-        <div class="zone-right"></div>
-    </div>
     <div class="joystick-container" id="joystickContainer">
         <div class="joystick-base"><div class="joystick-thumb" id="joystickThumb"></div></div>
     </div>
@@ -215,7 +186,7 @@
     <div class="weapon-info" id="weaponInfo">🗡️ Меч (урон 28)</div>
     <div class="reload-indicator"><div class="reload-fill" id="reloadFill"></div></div>
     <div class="boss-health" id="bossHealthBar"><div class="boss-fill" id="bossFill"></div></div>
-    <div class="instruction">👉 Левая зона - движение | Правая зона - прицел и удар (зажми, веди, отпусти)</div>
+    <div class="instruction">👉 Левая зона (джойстик) — движение | Правая зона (вести палец, отпустить) — атака</div>
 
     <script>
         (function(){
@@ -304,6 +275,18 @@
                     ctx.fillStyle='#900'; ctx.fillRect(x, y-8, this.w, 5);
                     ctx.fillStyle='#0a0'; ctx.fillRect(x, y-8, this.w*hpPercent, 5);
                 }
+            }
+            
+            // Спавн врагов со временем, чтобы можно было набрать убийства
+            let enemySpawnTimer = 0;
+            function spawnRandomEnemy() {
+                let x = player.x + (Math.random() - 0.5) * 800;
+                let y = player.y + (Math.random() - 0.5) * 800;
+                x = Math.min(Math.max(x, 100), WORLD_WIDTH-100);
+                y = Math.min(Math.max(y, 100), WORLD_HEIGHT-100);
+                // не спавнить прямо на игрока
+                if(Math.hypot(x - player.x, y - player.y) < 150) return;
+                enemies.push(new Enemy(x, y));
             }
             
             // ---------- БОСС ----------
@@ -451,7 +434,6 @@
             let aimStartX = 0, aimStartY = 0;
             const aimDot = document.getElementById('aimDot');
             
-            // Проверка, находится ли точка в правой нижней четверти экрана
             function isInRightZone(x, y) {
                 return x > CANVAS_W/2 && y > CANVAS_H/2;
             }
@@ -496,13 +478,11 @@
                 e.preventDefault();
                 aiming = false;
                 aimDot.style.display = 'none';
-                // Выполняем атаку
                 if(currentWeapon.attackCooldown <= 0) {
                     executeAttack(aimDirection);
                 }
             }
             
-            // Подключаем события для правой зоны (весь canvas, но фильтр по координатам)
             canvas.addEventListener('touchstart', handleAimStart);
             canvas.addEventListener('touchmove', handleAimMove);
             canvas.addEventListener('touchend', handleAimEnd);
@@ -510,10 +490,9 @@
             canvas.addEventListener('mousemove', (e) => { if(aiming) handleAimMove(e); });
             canvas.addEventListener('mouseup', handleAimEnd);
             
-            // Для ПК также клик правой кнопкой или просто клик в правой зоне
+            // Для ПК также клик в правой зоне без зажатия (быстрый выстрел)
             canvas.addEventListener('click', (e) => {
                 if(window.innerWidth > 768 && isInRightZone(e.clientX, e.clientY) && currentWeapon.attackCooldown <= 0) {
-                    // используем направление от игрока к курсору
                     let rect = canvas.getBoundingClientRect();
                     let mouseCanvasX = (e.clientX - rect.left) * CANVAS_W / rect.width;
                     let mouseCanvasY = (e.clientY - rect.top) * CANVAS_H / rect.height;
@@ -640,7 +619,6 @@
                 return false;
             }
             
-            // Клавиатура для движения (дополнительно)
             const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false };
             window.addEventListener('keydown', (e)=>{
                 let k=e.key;
@@ -671,6 +649,16 @@
                     spawnBoss();
                 }
                 if(boss) boss.update();
+            }
+            
+            // Спавн врагов каждые 10 секунд, чтобы всегда были противники
+            function updateEnemySpawning(delta) {
+                if(boss) return; // если босс есть, новых врагов не спавним
+                enemySpawnTimer += delta;
+                if(enemySpawnTimer > 8.0 && enemies.length < 6) {
+                    enemySpawnTimer = 0;
+                    spawnRandomEnemy();
+                }
             }
             
             // ---------- ОТРИСОВКА ----------
@@ -745,6 +733,7 @@
                     for(let e of enemies) e.update();
                     updateMovement();
                     checkWeaponPickup();
+                    updateEnemySpawning(delta);
                     checkBossSpawn();
                 }
                 lastTime=now;
@@ -763,7 +752,8 @@
             
             function gameLoop(t){ render(t); requestAnimationFrame(gameLoop); }
             scatterWeapons();
-            for(let i=0;i<3;i++) enemies.push(new Enemy(700+i*150, 800));
+            // Начальные враги
+            for(let i=0;i<6;i++) spawnRandomEnemy();
             gameLoop(performance.now());
         })();
     </script>
