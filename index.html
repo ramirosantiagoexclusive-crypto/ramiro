@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс работает (финал)</title>
+    <title>2.5D Adventure - Босс работает + джойстики</title>
     <style>
         * {
             margin: 0;
@@ -15,7 +15,7 @@
         body {
             background: #0a2a22;
             overflow: hidden;
-            touch-action: none;
+            touch-action: none; /* важно для nipplejs */
             font-family: system-ui, 'Segoe UI', monospace;
         }
         canvas {
@@ -26,7 +26,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            pointer-events: none;
+            /* pointer-events: none; УБРАНО, чтобы не мешать джойстикам, но они всё равно поверх */
+            z-index: 0;
         }
         .joystick-area {
             position: fixed;
@@ -50,7 +51,7 @@
             border-radius: 20px;
             color: white;
             font-weight: bold;
-            z-index: 100;
+            z-index: 200;
             pointer-events: none;
             display: flex;
             gap: 20px;
@@ -66,7 +67,7 @@
             border-radius: 20px;
             color: #ffcc66;
             font-weight: bold;
-            z-index: 100;
+            z-index: 200;
             pointer-events: none;
             font-size: 14px;
             backdrop-filter: blur(4px);
@@ -80,7 +81,7 @@
             background: #444;
             border-radius: 3px;
             overflow: hidden;
-            z-index: 100;
+            z-index: 200;
         }
         .reload-fill {
             width: 100%;
@@ -99,7 +100,7 @@
             border-radius: 12px;
             border: 2px solid #d66;
             overflow: hidden;
-            z-index: 100;
+            z-index: 200;
             display: none;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
@@ -152,7 +153,7 @@
             padding: 2px 8px;
             border-radius: 20px;
             pointer-events: none;
-            z-index: 100;
+            z-index: 200;
         }
         @media (max-width: 700px) {
             .ui, .weapon-info { font-size: 12px; }
@@ -223,7 +224,7 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            // ---------- ОБЫЧНЫЙ ВРАГ (РАБОТАЕТ ОТЛИЧНО) ----------
+            // ---------- ОБЫЧНЫЙ ВРАГ ----------
             class Enemy {
                 constructor(x, y, type="normal") {
                     this.x = x; this.y = y; this.w = 32; this.h = 32;
@@ -286,27 +287,25 @@
                 }
             }
             
-            // ---------- БОСС - ПОЛНАЯ КОПИЯ ENEMY, НО С ДРУГИМИ РАЗМЕРАМИ И УРОНОМ ----------
-            class BossEnemy {
+            // ---------- БОСС НАСЛЕДУЕТ ВСЁ ОТ ENEMY, НО МЕНЯЕМ ПАРАМЕТРЫ ----------
+            class Boss extends Enemy {
                 constructor(x, y) {
-                    this.x = x;
-                    this.y = y;
+                    super(x, y, "boss");
                     this.w = 76;
                     this.h = 76;
                     this.hp = 480;
                     this.maxHp = 480;
                     this.speed = 3.2;
-                    this.attackTimer = 0;
                     this.attackRadius = 70;
                     this.attackDamage = 34;
                     this.phase = 1;
                     this.swingActive = false;
                     this.swingTimer = 0;
+                    this.attackTimer = 0;
                 }
                 
-                // ТОЧНО ТАКОЙ ЖЕ update, КАК У ENEMY, НО С ДРУГИМИ ПАРАМЕТРАМИ
                 update(delta) {
-                    // Движение - один в один с Enemy
+                    // Движение — полная копия из Enemy (работает)
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -318,13 +317,12 @@
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
-                    // Атака - с большим радиусом
+                    // Атака с увеличенным радиусом
                     const distToPlayer = Math.hypot(this.x+this.w/2 - (player.x+PLAYER_W/2), this.y+this.h/2 - (player.y+PLAYER_H/2));
                     if (this.attackTimer <= 0 && distToPlayer < this.attackRadius) {
                         if (player.invTimer <= 0) {
                             player.hp -= this.attackDamage;
                             player.invTimer = 0.6;
-                            // Эффект удара
                             for (let i = 0; i < 15; i++) {
                                 particles.push({
                                     x: player.x + PLAYER_W/2 + (Math.random()-0.5)*30,
@@ -342,13 +340,11 @@
                     }
                     if (this.attackTimer > 0) this.attackTimer -= delta;
                     
-                    // Анимация
                     if (this.swingActive) {
                         this.swingTimer -= delta;
                         if (this.swingTimer <= 0) this.swingActive = false;
                     }
                     
-                    // Фаза 2
                     if (this.hp <= this.maxHp * 0.5 && this.phase === 1) {
                         this.phase = 2;
                         this.speed = 4.8;
@@ -360,94 +356,47 @@
                             });
                         }
                     }
-                    
-                    // Отладка: выводим координаты раз в 60 кадров
-                    if (Math.random() < 0.02) console.log("Босс на позиции: x=" + Math.floor(this.x) + ", y=" + Math.floor(this.y));
                 }
                 
                 draw(cam) {
                     let x = this.x - cam.x, y = this.y - cam.y;
                     if (x + this.w < 0 || x > canvas.width || y + this.h < 0 || y > canvas.height) return;
                     
-                    // Тень
                     ctx.fillStyle = 'rgba(0,0,0,0.55)';
-                    ctx.beginPath();
-                    ctx.ellipse(x + this.w/2 + 4, y + this.h - 8, this.w/2 + 8, 12, 0, 0, Math.PI*2);
-                    ctx.fill();
-                    
-                    // Тело
-                    ctx.fillStyle = '#4a2a2a';
-                    ctx.fillRect(x, y, this.w, this.h);
-                    ctx.fillStyle = '#7a5a4a';
-                    ctx.fillRect(x + 8, y - 10, this.w - 16, 14);
-                    ctx.fillStyle = '#b87c4f';
-                    ctx.fillRect(x + 12, y - 6, this.w - 24, 8);
-                    ctx.fillStyle = '#8b5a3c';
-                    ctx.fillRect(x + 10, y + 15, this.w - 20, 35);
-                    ctx.fillStyle = '#c99a6b';
-                    ctx.fillRect(x + 20, y + 25, this.w - 40, 12);
-                    
-                    // Шлем
-                    ctx.fillStyle = '#5a3a2a';
-                    ctx.fillRect(x + 15, y - 6, this.w - 30, 18);
+                    ctx.beginPath(); ctx.ellipse(x + this.w/2 + 4, y + this.h - 8, this.w/2 + 8, 12, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#4a2a2a'; ctx.fillRect(x, y, this.w, this.h);
+                    ctx.fillStyle = '#7a5a4a'; ctx.fillRect(x + 8, y - 10, this.w - 16, 14);
+                    ctx.fillStyle = '#b87c4f'; ctx.fillRect(x + 12, y - 6, this.w - 24, 8);
+                    ctx.fillStyle = '#8b5a3c'; ctx.fillRect(x + 10, y + 15, this.w - 20, 35);
+                    ctx.fillStyle = '#c99a6b'; ctx.fillRect(x + 20, y + 25, this.w - 40, 12);
+                    ctx.fillStyle = '#5a3a2a'; ctx.fillRect(x + 15, y - 6, this.w - 30, 18);
                     ctx.fillStyle = '#a66';
-                    ctx.beginPath();
-                    ctx.moveTo(x + 12, y - 4);
-                    ctx.lineTo(x + 26, y - 14);
-                    ctx.lineTo(x + 34, y - 4);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.moveTo(x + this.w - 12, y - 4);
-                    ctx.lineTo(x + this.w - 26, y - 14);
-                    ctx.lineTo(x + this.w - 34, y - 4);
-                    ctx.fill();
-                    
-                    // Глаза
+                    ctx.beginPath(); ctx.moveTo(x + 12, y - 4); ctx.lineTo(x + 26, y - 14); ctx.lineTo(x + 34, y - 4); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(x + this.w - 12, y - 4); ctx.lineTo(x + this.w - 26, y - 14); ctx.lineTo(x + this.w - 34, y - 4); ctx.fill();
                     ctx.fillStyle = '#ff6600';
-                    ctx.beginPath();
-                    ctx.arc(x + this.w*0.35, y + this.h*0.3, 7, 0, Math.PI*2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(x + this.w*0.65, y + this.h*0.3, 7, 0, Math.PI*2);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(x + this.w*0.35, y + this.h*0.3, 7, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(x + this.w*0.65, y + this.h*0.3, 7, 0, Math.PI*2); ctx.fill();
                     ctx.fillStyle = '#ffcc44';
-                    ctx.beginPath();
-                    ctx.arc(x + this.w*0.35 - 1, y + this.h*0.3 - 1, 2.8, 0, Math.PI*2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(x + this.w*0.65 - 1, y + this.h*0.3 - 1, 2.8, 0, Math.PI*2);
-                    ctx.fill();
-                    
-                    // Меч
+                    ctx.beginPath(); ctx.arc(x + this.w*0.35 - 1, y + this.h*0.3 - 1, 2.8, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(x + this.w*0.65 - 1, y + this.h*0.3 - 1, 2.8, 0, Math.PI*2); ctx.fill();
                     ctx.fillStyle = '#bbb';
                     ctx.fillRect(x + this.w - 22, y + this.h*0.6, 30, 10);
                     ctx.fillStyle = '#eecc88';
                     ctx.fillRect(x + this.w - 14, y + this.h*0.55, 18, 6);
                     
-                    // Эффект атаки
                     if (this.swingActive) {
-                        const cx = x + this.w/2;
-                        const cy = y + this.h/2;
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, this.attackRadius - 5, 0, Math.PI*2);
-                        ctx.strokeStyle = '#ffaa33';
-                        ctx.lineWidth = 10;
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, this.attackRadius - 12, 0, Math.PI*2);
-                        ctx.strokeStyle = '#ffdd77';
-                        ctx.lineWidth = 5;
-                        ctx.stroke();
+                        const cx = x + this.w/2, cy = y + this.h/2;
+                        ctx.beginPath(); ctx.arc(cx, cy, this.attackRadius - 5, 0, Math.PI*2);
+                        ctx.strokeStyle = '#ffaa33'; ctx.lineWidth = 10; ctx.stroke();
+                        ctx.beginPath(); ctx.arc(cx, cy, this.attackRadius - 12, 0, Math.PI*2);
+                        ctx.strokeStyle = '#ffdd77'; ctx.lineWidth = 5; ctx.stroke();
                     }
                     
-                    // Полоска здоровья
                     const pct = this.hp / this.maxHp;
                     const bossFill = document.getElementById('bossFill');
                     if (bossFill) bossFill.style.width = (pct * 100) + '%';
-                    
                     if (this.phase === 2) {
-                        ctx.fillStyle = 'rgba(255,100,50,0.5)';
-                        ctx.fillRect(x, y, this.w, 8);
+                        ctx.fillStyle = 'rgba(255,100,50,0.5)'; ctx.fillRect(x, y, this.w, 8);
                     }
                 }
                 
@@ -457,20 +406,15 @@
                         particles.push({
                             x: this.x + this.w/2 + (Math.random() - 0.5) * 30,
                             y: this.y + this.h/2 + (Math.random() - 0.5) * 30,
-                            life: 0.28,
-                            vx: (Math.random() - 0.5) * 6,
-                            vy: (Math.random() - 0.5) * 6,
-                            color: "#c44"
+                            life: 0.28, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, color: "#c44"
                         });
                     }
                     return this.hp <= 0;
                 }
                 
                 collidesWithPlayer() {
-                    const pCenterX = player.x + PLAYER_W/2;
-                    const pCenterY = player.y + PLAYER_H/2;
-                    const bCenterX = this.x + this.w/2;
-                    const bCenterY = this.y + this.h/2;
+                    const pCenterX = player.x + PLAYER_W/2, pCenterY = player.y + PLAYER_H/2;
+                    const bCenterX = this.x + this.w/2, bCenterY = this.y + this.h/2;
                     return Math.hypot(pCenterX - bCenterX, pCenterY - bCenterY) < (PLAYER_W/2 + this.w/2 + 10);
                 }
             }
@@ -480,41 +424,34 @@
             function spawnEnemy() {
                 let types = ["normal", "fast", "tank"];
                 let type = types[Math.floor(Math.random()*types.length)];
-                let x = player.x + (Math.random()-0.5)*700;
-                let y = player.y + (Math.random()-0.5)*700;
-                x = Math.min(Math.max(x,80), WORLD_W-80);
-                y = Math.min(Math.max(y,80), WORLD_H-80);
+                let x = player.x + (Math.random()-0.5)*700, y = player.y + (Math.random()-0.5)*700;
+                x = Math.min(Math.max(x,80), WORLD_W-80); y = Math.min(Math.max(y,80), WORLD_H-80);
                 if(Math.hypot(x-player.x, y-player.y) < 200) return;
                 enemies.push(new Enemy(x,y,type));
             }
             
             function spawnBoss() {
                 if (boss || bossDefeated) return;
-                let spawnX = player.x + (Math.random() - 0.5) * 400;
-                let spawnY = player.y + (Math.random() - 0.5) * 400;
+                let spawnX = player.x + (Math.random() - 0.5) * 400, spawnY = player.y + (Math.random() - 0.5) * 400;
                 spawnX = Math.min(Math.max(spawnX, 100), WORLD_W - 100);
                 spawnY = Math.min(Math.max(spawnY, 100), WORLD_H - 100);
-                boss = new BossEnemy(spawnX, spawnY);
+                boss = new Boss(spawnX, spawnY);
                 document.getElementById('bossBar').style.display = 'block';
                 for (let i = 0; i < 55; i++) {
                     particles.push({
                         x: spawnX + 38, y: spawnY + 38,
-                        life: 0.7, vx: (Math.random() - 0.5) * 12,
-                        vy: (Math.random() - 0.5) * 12, color: "#ff8844"
+                        life: 0.7, vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12, color: "#ff8844"
                     });
                 }
-                console.log("БОСС СОЗДАН! Координаты: " + boss.x + ", " + boss.y);
             }
             
             function spawnMedkit(x,y){ medkits.push({x,y, w:20, h:20}); }
             function scatterMedkits(){
                 for(let i=0;i<8;i++){
-                    let x=150+Math.random()*(WORLD_W-300);
-                    let y=150+Math.random()*(WORLD_H-300);
+                    let x=150+Math.random()*(WORLD_W-300), y=150+Math.random()*(WORLD_H-300);
                     let ok=true;
                     for(let w of walls) if(x<w.x+w.w+30 && x+30>w.x && y<w.y+w.h+30 && y+30>w.y) ok=false;
-                    if(ok) spawnMedkit(x,y);
-                    else spawnMedkit(500+i*150, 500+i*100);
+                    if(ok) spawnMedkit(x,y); else spawnMedkit(500+i*150, 500+i*100);
                 }
             }
             function addItem(x,y,idx){ items.push({x,y,w:26,h:26,weaponIdx:idx}); }
@@ -522,13 +459,10 @@
                 for(let i=0;i<weaponsLib.length;i++){
                     let placed=false;
                     for(let t=0;t<20;t++){
-                        let x=150+Math.random()*(WORLD_W-300);
-                        let y=150+Math.random()*(WORLD_H-300);
+                        let x=150+Math.random()*(WORLD_W-300), y=150+Math.random()*(WORLD_H-300);
                         let ok=true;
                         for(let w of walls) if(x<w.x+w.w+30 && x+30>w.x && y<w.y+w.h+30 && y+30>w.y) ok=false;
-                        if(ok && Math.hypot(x-player.x, y-player.y)>200){
-                            addItem(x,y,i); placed=true; break;
-                        }
+                        if(ok && Math.hypot(x-player.x, y-player.y)>200){ addItem(x,y,i); placed=true; break; }
                     }
                     if(!placed) addItem(500+i*200, 500+i*150, i);
                 }
@@ -545,7 +479,8 @@
                     .on('move', (evt, nipple) => { const v = nipple.vector; moveVec.x = v.x; moveVec.y = -v.y; })
                     .on('end', () => { moveVec = {x:0, y:0}; });
                 nipplejs.create({ zone: document.getElementById('attackArea'), mode: 'static', size: 110, color: '#ff8844', restOpacity: 0.7, shape: 'circle' })
-                    .on('move', (evt, nipple) => { const v = nipple.vector; let dx=v.x, dy=-v.y; let len=Math.hypot(dx,dy); if(len>0.01){ dx/=len; dy/=len; } else { dx=1; dy=0; } performAttack({x:dx, y:dy}); });
+                    .on('move', (evt, nipple) => { const v = nipple.vector; let dx=v.x, dy=-v.y; let len=Math.hypot(dx,dy); if(len>0.01){ dx/=len; dy/=len; } else { dx=1; dy=0; } performAttack({x:dx, y:dy}); })
+                    .on('end', () => {});
             }
             document.getElementById('attackArea').addEventListener('click', (e) => {
                 let dx = e.clientX - (player.x - camera.x + PLAYER_W/2);
@@ -562,21 +497,17 @@
                     let ax = player.x + PLAYER_W/2, ay = player.y + PLAYER_H/2;
                     let hit = false;
                     for (let i = 0; i < enemies.length; i++) {
-                        let e = enemies[i];
-                        let ex = e.x + e.w/2, ey = e.y + e.h/2;
+                        let e = enemies[i], ex = e.x + e.w/2, ey = e.y + e.h/2;
                         if (Math.hypot(ax - ex, ay - ey) < weapon.range) {
-                            let kbDir = { x: ex-ax, y: ey-ay };
-                            let kblen = Math.hypot(kbDir.x, kbDir.y);
+                            let kbDir = { x: ex-ax, y: ey-ay }; let kblen = Math.hypot(kbDir.x, kbDir.y);
                             if(kblen>0.01){ kbDir.x/=kblen; kbDir.y/=kblen; }
-                            let dead = e.takeDamage(weapon.damage, kbDir);
-                            hit = true;
+                            let dead = e.takeDamage(weapon.damage, kbDir); hit = true;
                             for(let p=0;p<8;p++) particles.push({ x:ex, y:ey, life:0.3, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4, color:"#f44" });
                             if(dead) { enemies.splice(i,1); player.kills++; document.getElementById('kills').innerText = player.kills; i--; }
                         }
                     }
                     if (boss && Math.hypot(ax - (boss.x+boss.w/2), ay - (boss.y+boss.h/2)) < weapon.range+30) {
-                        let dead = boss.takeDamage(weapon.damage);
-                        hit = true;
+                        let dead = boss.takeDamage(weapon.damage); hit = true;
                         for(let p=0;p<16;p++) particles.push({ x:boss.x+boss.w/2, y:boss.y+boss.h/2, life:0.4, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, color:"#f80" });
                         if(dead) { boss=null; bossDefeated=true; document.getElementById('bossBar').style.display='none'; }
                     }
@@ -618,8 +549,7 @@
                 let len = Math.hypot(mx, my);
                 if (len > 0) { mx /= len; my /= len; }
                 if (mx !== 0 || my !== 0) { player.dirX = mx; player.dirY = my; player.anim += 0.2; } else player.anim = 0;
-                let newX = player.x + mx * SPEED;
-                let newY = player.y + my * SPEED;
+                let newX = player.x + mx * SPEED, newY = player.y + my * SPEED;
                 if (!collision(newX, player.y, PLAYER_W, PLAYER_H)) player.x = newX;
                 if (!collision(player.x, newY, PLAYER_W, PLAYER_H)) player.y = newY;
                 for(let e of enemies){
@@ -658,16 +588,14 @@
                     for(let j=0;j<enemies.length;j++) {
                         let e=enemies[j];
                         if(p.x>e.x && p.x<e.x+e.w && p.y>e.y && p.y<e.y+e.h){
-                            e.hp -= p.damage;
-                            projectiles.splice(i,1);
+                            e.hp -= p.damage; projectiles.splice(i,1);
                             for(let pt=0;pt<5;pt++) particles.push({ x:p.x, y:p.y, life:0.2, vx:(Math.random()-0.5)*2, vy:(Math.random()-0.5)*2, color:"#ffa" });
                             if(e.hp<=0) { enemies.splice(j,1); player.kills++; document.getElementById('kills').innerText=player.kills; j--; }
                             break;
                         }
                     }
                     if(boss && p.x>boss.x && p.x<boss.x+boss.w && p.y>boss.y && p.y<boss.y+boss.h) {
-                        let dead = boss.takeDamage(p.damage);
-                        projectiles.splice(i,1);
+                        let dead = boss.takeDamage(p.damage); projectiles.splice(i,1);
                         for(let pt=0;pt<8;pt++) particles.push({ x:p.x, y:p.y, life:0.3, vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3, color:"#f80" });
                         if(dead) { boss=null; bossDefeated=true; document.getElementById('bossBar').style.display='none'; }
                     }
@@ -713,32 +641,23 @@
                 spawnTimer += delta;
                 if (spawnTimer > 5.0 && enemies.length < 7) { spawnTimer = 0; spawnEnemy(); }
                 if (!boss && !bossDefeated && player.kills >= 5) spawnBoss();
-                if (boss) {
-                    boss.update(delta);
-                    // Дополнительная отладка каждые 2 секунды
-                    if (Math.random() < 0.01) console.log("Босс обновлён, позиция: " + boss.x + ", " + boss.y);
-                }
+                if (boss) boss.update(delta);
             }
             function updateEnemies(delta) { for(let e of enemies) e.update(delta); }
             function updateCamera() {
-                let tx = player.x + PLAYER_W/2 - canvas.width/2;
-                let ty = player.y + PLAYER_H/2 - canvas.height/2;
+                let tx = player.x + PLAYER_W/2 - canvas.width/2, ty = player.y + PLAYER_H/2 - canvas.height/2;
                 camera.x = Math.min(Math.max(0, tx), WORLD_W - canvas.width);
                 camera.y = Math.min(Math.max(0, ty), WORLD_H - canvas.height);
             }
             
-            // --- ОТРИСОВКА ---
+            // --- ОТРИСОВКА (полная) ---
             function drawGround() {
                 let grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
                 grad.addColorStop(0, '#5d9652'); grad.addColorStop(1, '#2b522c');
                 ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
                 for(let i=0;i<600;i++) {
-                    let wx = (i*311)%WORLD_W, wy = (i*457)%WORLD_H;
-                    let sx = wx-camera.x, sy = wy-camera.y;
-                    if(sx>0 && sx<canvas.width && sy>0 && sy<canvas.height){
-                        ctx.fillStyle = 'rgba(210,240,120,0.25)';
-                        ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill();
-                    }
+                    let wx = (i*311)%WORLD_W, wy = (i*457)%WORLD_H, sx = wx-camera.x, sy = wy-camera.y;
+                    if(sx>0 && sx<canvas.width && sy>0 && sy<canvas.height){ ctx.fillStyle = 'rgba(210,240,120,0.25)'; ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill(); }
                 }
             }
             function drawWalls() { for(let w of walls){ let x=w.x-camera.x, y=w.y-camera.y; if(x+w.w<0||x>canvas.width||y+w.h<0||y>canvas.height) continue; ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x+w.w/2+2,y+w.h-3,w.w/2+4,8,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#5f5035'; ctx.fillRect(x,y+22,w.w,w.h); ctx.fillStyle='#b39d6b'; ctx.beginPath(); ctx.moveTo(x,y+22); ctx.lineTo(x+w.w,y+22); ctx.lineTo(x+w.w-5,y); ctx.lineTo(x+5,y); ctx.fill(); ctx.fillStyle='#473d28'; ctx.fillRect(x+w.w-6,y+20,6,w.h); } }
@@ -748,8 +667,7 @@
                 for(let m of medkits){ let x=m.x-camera.x, y=m.y-camera.y; if(x<-20||x>canvas.width+20) continue; ctx.fillStyle='#4caf50'; ctx.fillRect(x,y,m.w,m.h); ctx.fillStyle='#fff'; ctx.font='bold 16px monospace'; ctx.fillText("+", x+6, y+16); }
             }
             function drawPlayer() {
-                let px=player.x-camera.x, py=player.y-camera.y;
-                let cx=px+PLAYER_W/2, cy=py+PLAYER_H/2;
+                let px=player.x-camera.x, py=player.y-camera.y, cx=px+PLAYER_W/2, cy=py+PLAYER_H/2;
                 ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(cx+3,cy+6,20,10,0,0,Math.PI*2); ctx.fill();
                 let step=Math.sin(player.anim*Math.PI)*2;
                 ctx.fillStyle='#628e84'; ctx.beginPath(); ctx.ellipse(cx, cy+3+step*0.2, 17,19,0,0,Math.PI*2); ctx.fill();
@@ -760,11 +678,7 @@
                 ctx.beginPath(); ctx.ellipse(cx+5+eyeX*0.4, cy-11+eyeY*0.6+step*0.05,3.8,4.5,0,0,Math.PI*2); ctx.fill();
                 ctx.fillStyle='#1f2f28'; ctx.beginPath(); ctx.ellipse(cx-7+eyeX, cy-10+eyeY*0.8+step*0.05,2,2.5,0,0,Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.ellipse(cx+5+eyeX, cy-10+eyeY*0.8+step*0.05,2,2.5,0,0,Math.PI*2); ctx.fill();
-                if(meleeSwing.active){
-                    let ang=meleeSwing.angle, ax=meleeSwing.x-camera.x, ay=meleeSwing.y-camera.y;
-                    ctx.beginPath(); ctx.arc(ax, ay, 34, ang-0.9, ang+0.9); ctx.strokeStyle='#ffdd88'; ctx.lineWidth=6; ctx.stroke();
-                    ctx.beginPath(); ctx.arc(ax, ay, 34, ang-0.9, ang+0.9); ctx.strokeStyle='#ffaa33'; ctx.lineWidth=3; ctx.stroke();
-                }
+                if(meleeSwing.active){ let ang=meleeSwing.angle, ax=meleeSwing.x-camera.x, ay=meleeSwing.y-camera.y; ctx.beginPath(); ctx.arc(ax, ay, 34, ang-0.9, ang+0.9); ctx.strokeStyle='#ffdd88'; ctx.lineWidth=6; ctx.stroke(); ctx.beginPath(); ctx.arc(ax, ay, 34, ang-0.9, ang+0.9); ctx.strokeStyle='#ffaa33'; ctx.lineWidth=3; ctx.stroke(); }
                 if(player.invTimer>0 && (Math.floor(Date.now()/50)%2===0)) ctx.globalAlpha=0.5;
             }
             function drawProjectiles() { for(let p of projectiles){ let sx=p.x-camera.x, sy=p.y-camera.y; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(sx,sy,p.size,0,Math.PI*2); ctx.fill(); } }
@@ -773,11 +687,9 @@
             function showDeath() {
                 if(!gameActive) return;
                 gameActive = false;
-                let div = document.createElement('div');
-                div.className = 'death-screen';
+                let div = document.createElement('div'); div.className = 'death-screen';
                 div.innerHTML = '<div class="death-window"><h2>💀 ВЫ ПОВЕРЖЕНЫ 💀</h2><button id="restart">Возродиться</button></div>';
-                document.body.appendChild(div);
-                document.getElementById('restart').onclick = () => location.reload();
+                document.body.appendChild(div); document.getElementById('restart').onclick = () => location.reload();
             }
             
             // --- ГЛАВНЫЙ ЦИКЛ ---
@@ -796,10 +708,7 @@
                 }
                 lastTimestamp = now;
                 updateCamera();
-                drawGround();
-                drawWalls();
-                drawDecor();
-                drawItems();
+                drawGround(); drawWalls(); drawDecor(); drawItems();
                 for(let e of enemies) e.draw(camera);
                 if(boss) boss.draw(camera);
                 drawProjectiles();
@@ -811,11 +720,9 @@
             }
             
             // --- ЗАПУСК ---
-            scatterItems();
-            scatterMedkits();
+            scatterItems(); scatterMedkits();
             for(let i=0;i<5;i++) spawnEnemy();
-            lastTimestamp = performance.now();
-            gameLoop(lastTimestamp);
+            lastTimestamp = performance.now(); gameLoop(lastTimestamp);
         })();
     </script>
 </body>
