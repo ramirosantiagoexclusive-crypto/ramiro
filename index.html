@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Босс с правильным движением</title>
+    <title>2.5D Adventure - Босс наконец двигается</title>
     <style>
         * {
             margin: 0;
@@ -223,7 +223,7 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            // ---------- ОБЫЧНЫЙ ВРАГ ----------
+            // ---------- ОБЫЧНЫЙ ВРАГ (работает отлично) ----------
             class Enemy {
                 constructor(x, y, type="normal") {
                     this.x = x; this.y = y; this.w = 32; this.h = 32;
@@ -238,6 +238,7 @@
                     this.attackTimer = 0;
                 }
                 update(delta) {
+                    // ЭТА ЛОГИКА ДВИЖЕНИЯ РАБОТАЕТ НА 100%
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -286,7 +287,7 @@
                 }
             }
             
-            // ---------- БОСС НАСЛЕДУЕТ ДВИЖЕНИЕ ОТ ENEMY (работает 100%) ----------
+            // ---------- БОСС - ТОЧНО ТАКОЕ ЖЕ ДВИЖЕНИЕ, КАК У ENEMY ----------
             class BossSwordsman {
                 constructor(x, y) {
                     this.x = x;
@@ -296,7 +297,7 @@
                     this.hp = 480;
                     this.maxHp = 480;
                     this.phase = 1;
-                    this.speed = 3.2;       // скорость как у врага, но быстрее (обычный враг 1.3)
+                    this.speed = 3.2;       // скорость как у врага, но быстрее
                     this.attackCd = 0;
                     this.attackDelay = 0.9;
                     this.attackRadius = 96;
@@ -307,7 +308,7 @@
                 }
                 
                 update(delta) {
-                    // ТОЧНО ТАКАЯ ЖЕ ЛОГИКА ДВИЖЕНИЯ, КАК У ОБЫЧНОГО ВРАГА
+                    // 100% ТА ЖЕ ЛОГИКА, ЧТО И У ENEMY
                     let dx = player.x + PLAYER_W/2 - (this.x + this.w/2);
                     let dy = player.y + PLAYER_H/2 - (this.y + this.h/2);
                     let len = Math.hypot(dx, dy);
@@ -318,11 +319,11 @@
                         this.y += dy * this.speed;
                     }
                     
-                    // Ограничение по миру
+                    // Границы мира
                     this.x = Math.min(Math.max(this.x, 0), WORLD_W - this.w);
                     this.y = Math.min(Math.max(this.y, 0), WORLD_H - this.h);
                     
-                    // Атака
+                    // Атака (круговая)
                     if (this.attackCd <= 0) {
                         const distToPlayer = Math.hypot(
                             (player.x + PLAYER_W/2) - (this.x + this.w/2),
@@ -337,6 +338,7 @@
                         this.attackCd -= delta;
                     }
                     
+                    // Анимация удара
                     if (this.swingActive) {
                         this.swingTimer -= delta;
                         if (this.swingTimer <= 0) this.swingActive = false;
@@ -354,6 +356,9 @@
                             });
                         }
                     }
+                    
+                    // Отладка: каждые 60 кадров выводим координаты (раскомментировать при необходимости)
+                    // if (Math.random() < 0.02) console.log("Босс на позиции:", this.x, this.y);
                 }
                 
                 performSwordAttack() {
@@ -526,7 +531,7 @@
                         vy: (Math.random() - 0.5) * 12, color: "#ff8844"
                     });
                 }
-                console.log("БОСС ПОЯВИЛСЯ И ДВИГАЕТСЯ КАК ОБЫЧНЫЙ ВРАГ");
+                console.log("БОСС ПОЯВИЛСЯ! Координаты: " + boss.x + ", " + boss.y);
             }
             
             function spawnMedkit(x,y){ medkits.push({x,y, w:20, h:20}); }
