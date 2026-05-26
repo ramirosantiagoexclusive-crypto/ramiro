@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>2.5D Adventure - Кастомные джойстики</title>
+    <title>2.5D Adventure - Исправлена камера</title>
     <style>
         * {
             margin: 0;
@@ -15,7 +15,7 @@
         body {
             background: #0a2a22;
             overflow: hidden;
-            touch-action: none; /* отключаем прокрутку страницы, но canvas не ломается */
+            touch-action: none;
             font-family: system-ui, 'Segoe UI', monospace;
         }
         canvas {
@@ -644,7 +644,6 @@
                 }
                 weapon.cd = finalDelay;
                 if (window.comboBonusActive) weapon.cd *= 0.8;
-                // Вибрация при критическом ударе (если поддерживается)
                 if (isCrit && navigator.vibrate) navigator.vibrate(50);
             }
             
@@ -744,9 +743,14 @@
                     if (enemies.length < maxEnemies-3 && Math.random()<0.4) spawnRandomEnemy();
                 }
             }
+            
+            // ---------- ИСПРАВЛЕННАЯ КАМЕРА (игрок в нижней части экрана) ----------
             function updateCamera() {
+                // Центрируем по X
                 let tx = player.x + PLAYER_W/2 - canvas.width/2;
-                let ty = player.y + PLAYER_H/2 - canvas.height/2;
+                // Игрок на 65% высоты экрана (ближе к низу, оставляя больше места вверху)
+                let ty = player.y + PLAYER_H/2 - canvas.height * 0.65;
+                // Ограничиваем, чтобы не выходить за пределы мира
                 camera.x = Math.min(Math.max(0, tx), WORLD_W - canvas.width);
                 camera.y = Math.min(Math.max(0, ty), WORLD_H - canvas.height);
             }
@@ -842,7 +846,6 @@
                 ctx.globalCompositeOperation = 'source-over';
             }
             function drawJoysticks() {
-                // Рисуем круги джойстиков (визуально)
                 if (joystickMove.active) {
                     let x = joystickMove.currentX, y = joystickMove.currentY;
                     ctx.globalAlpha = 0.5;
@@ -878,7 +881,6 @@
                 const touch = e.touches[0];
                 const x = touch.clientX - rect.left;
                 const y = touch.clientY - rect.top;
-                // Левая половина экрана - джойстик движения
                 if (x < canvas.width / 2) {
                     joystickMove.active = true;
                     joystickMove.startX = x;
@@ -886,9 +888,7 @@
                     joystickMove.currentX = x;
                     joystickMove.currentY = y;
                     joystickMove.vector = { x:0, y:0 };
-                } 
-                // Правая половина - атака
-                else {
+                } else {
                     joystickAttack.active = true;
                     joystickAttack.startX = x;
                     joystickAttack.startY = y;
@@ -919,7 +919,6 @@
                     }
                     let vecX = dx / maxDist;
                     let vecY = dy / maxDist;
-                    if (dist > maxDist) { vecX = dx / maxDist; vecY = dy / maxDist; }
                     joystickMove.vector = { x: Math.min(1, Math.max(-1, vecX)), y: Math.min(1, Math.max(-1, vecY)) };
                 }
                 if (joystickAttack.active) {
@@ -940,7 +939,7 @@
                         let angle = Math.atan2(dy, dx);
                         let dir = { x: Math.cos(angle), y: Math.sin(angle) };
                         performAttack(dir);
-                        joystickAttack.active = false; // атака по тапу/движению
+                        joystickAttack.active = false;
                     }
                 }
             }
@@ -953,7 +952,6 @@
                 }
                 if (joystickAttack.active) {
                     joystickAttack.active = false;
-                    // если просто тап без движения - атака по направлению взгляда
                     if (weapon.cd <= 0) {
                         performAttack({ x: player.dirX || 1, y: player.dirY || 0 });
                     }
@@ -964,7 +962,7 @@
             canvas.addEventListener('touchmove', handleTouchMove);
             canvas.addEventListener('touchend', handleTouchEnd);
             canvas.addEventListener('touchcancel', handleTouchEnd);
-            // Для мыши (для отладки на ПК)
+            // Мышь для ПК
             canvas.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 const rect = canvas.getBoundingClientRect();
@@ -996,7 +994,6 @@
                     window.addEventListener('mousemove', onMouseMove);
                     window.addEventListener('mouseup', onMouseUp);
                 } else {
-                    // атака по клику мыши
                     if (weapon.cd <= 0) performAttack({ x: player.dirX || 1, y: player.dirY || 0 });
                 }
             });
@@ -1025,7 +1022,7 @@
                 drawParticles();
                 drawLighting();
                 drawMinimap();
-                drawJoysticks(); // рисуем джойстики
+                drawJoysticks();
                 ctx.globalAlpha = 1;
                 ctx.fillStyle = '#c0e0a020'; ctx.fillRect(0,0,canvas.width,canvas.height);
                 requestAnimationFrame(gameLoop);
